@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#f0e6d3">
+<title>NeuNav 灵境</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap');
+
+:root {
+  --bg1: #f0e6d3; --bg2: #d4a574; --ink: #3b2210; --accent: #8b4513;
+  --paper: #faf6f0; --lightink: #a09080; --seal: #c03020;
+  --radius-seal: 2px 8px 2px 8px; --ease-brush: cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-seal: 0 4px 6px -1px rgba(59,50,44,0.15);
+  --shadow-ink: 0 8px 20px -6px rgba(59,50,44,0.3);
+}
+
+[data-theme="dark"] {
+  --bg1: #1a1a2e; --bg2: #16213e; --ink: #e0d8c0; --accent: #c9a84c;
+  --paper: #1e1e32; --lightink: #8a8570; --seal: #d4a84c;
+  --shadow-seal: 0 4px 6px -1px rgba(0,0,0,0.3);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family: 'Noto Serif SC', serif;
+  background: var(--bg1);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background .8s var(--ease-brush), color .8s var(--ease-brush);
+}
+
+/* Canvas Mountain */
+#mountain-canvas {
+  position: fixed; inset: 0; z-index: 0;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* App Container */
+#app {
+  position: relative; z-index: 1;
+  max-width: 480px; margin: 0 auto; padding: 0 16px 80px;
+}
+
+/* Top Bar */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0;
+}
+.ambiance-info { font-size: 13px; color: var(--lightink); line-height: 1.6; }
+.ambiance-poem { font-style: italic; font-family: 'Ma Shan Zheng', 'Noto Serif SC', cursive; font-size: 16px; color: var(--ink); margin-top: 4px; }
+.theme-toggle {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--paper); border: 1px solid var(--lightink);
+  font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+/* OmniBar */
+.omni-bar {
+  position: relative;
+  background: var(--paper);
+  border: 2px solid rgba(139,90,43,0.2);
+  border-radius: var(--radius-seal);
+  box-shadow: var(--shadow-seal);
+  padding: 4px;
+  display: flex; align-items: center;
+  margin-bottom: 16px;
+}
+.omni-bar input {
+  flex: 1; padding: 12px 16px;
+  background: transparent; border: none; outline: none;
+  font-family: 'Noto Serif SC', serif; font-size: 16px; color: var(--ink);
+}
+.omni-bar input::placeholder { color: var(--lightink); font-style: italic; }
+.omni-icon {
+  padding: 8px 12px; font-size: 20px; color: var(--lightink);
+}
+.omni-results {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: var(--paper); border-radius: var(--radius-seal);
+  box-shadow: var(--shadow-ink); margin-top: 4px;
+  max-height: 200px; overflow-y: auto; z-index: 10;
+}
+.omni-item {
+  padding: 10px 16px; cursor: pointer; font-size: 14px;
+  border-bottom: 1px solid rgba(139,90,43,0.08);
+  display: flex; align-items: center; gap: 8px;
+}
+.omni-item:last-child { border-bottom: none; }
+.omni-item:hover { background: rgba(139,90,43,0.06); }
+
+/* Categories */
+.categories {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 8px 0; margin-bottom: 8px;
+  scrollbar-width: none;
+}
+.categories::-webkit-scrollbar { display: none; }
+.cat-pill {
+  flex-shrink: 0; padding: 8px 14px;
+  border-radius: 20px; font-size: 13px;
+  background: var(--paper); border: 1px solid var(--lightink);
+  color: var(--lightink); cursor: pointer;
+  transition: all .2s var(--ease-brush);
+  white-space: nowrap;
+  box-shadow: var(--shadow-seal);
+}
+.cat-pill.active {
+  background: var(--ink); color: var(--bg1); border-color: var(--ink);
+}
+
+/* Bookmark Grid */
+.bookmark-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+}
+.bookmark-card {
+  background: var(--paper);
+  border-radius: var(--radius-seal);
+  box-shadow: var(--shadow-seal);
+  padding: 14px;
+  cursor: pointer;
+  transition: transform .2s var(--ease-brush), box-shadow .2s var(--ease-brush);
+  position: relative; overflow: hidden;
+}
+.bookmark-card:active { transform: scale(0.96); }
+.bookmark-card:hover { box-shadow: var(--shadow-ink); transform: scale(1.03); }
+.bm-icon {
+  font-size: 28px; margin-bottom: 8px; display: block;
+}
+.bm-title {
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bm-url {
+  font-size: 11px; color: var(--lightink); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bm-visit {
+  position: absolute; top: 8px; right: 8px;
+  font-size: 10px; color: var(--lightink);
+}
+.bm-delete {
+  position: absolute; bottom: 8px; right: 8px;
+  font-size: 14px; opacity: 0; transition: opacity .2s;
+  color: var(--seal); cursor: pointer; background: none; border: none;
+}
+.bookmark-card:hover .bm-delete { opacity: 1; }
+
+/* FAB */
+.fab {
+  position: fixed; bottom: 24px; right: 24px; z-index: 20;
+}
+.fab-btn {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--ink); color: var(--bg1);
+  border: none; font-size: 24px;
+  box-shadow: var(--shadow-ink); cursor: pointer;
+  transition: transform .2s var(--ease-brush);
+}
+.fab-btn:active { transform: scale(0.9); }
+
+/* Modal */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(30,20,10,0.5);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.modal {
+  background: var(--paper); border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 480px; padding: 24px 20px;
+  max-height: 80vh; overflow-y: auto;
+  animation: slideUp .3s var(--ease-brush);
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal h3 { font-size: 18px; color: var(--ink); margin-bottom: 16px; }
+.modal input, .modal select {
+  width: 100%; padding: 12px; border-radius: 8px;
+  border: 1px solid var(--lightink); background: var(--bg1);
+  font-family: 'Noto Serif SC', serif; font-size: 14px; color: var(--ink);
+  margin-bottom: 10px; outline: none;
+}
+.modal label { font-size: 12px; color: var(--lightink); display: block; margin-bottom: 4px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.modal-actions button { flex: 1; padding: 12px; border-radius: var(--radius-seal); border: none; font-size: 14px; cursor: pointer; font-family: 'Noto Serif SC', serif; }
+.btn-primary { background: var(--ink); color: var(--bg1); }
+.btn-cancel { background: transparent; color: var(--lightink); border: 1px solid var(--lightink) !important; }
+
+/* Empty state */
+.empty {
+  text-align: center; padding: 60px 20px; color: var(--lightink);
+  font-size: 14px; grid-column: span 2;
+}
+
+/* Seal stamp effect */
+@keyframes sealStamp {
+  0% { transform: scale(1.5) rotate(-5deg); opacity: 0; }
+  60% { transform: scale(0.95) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.seal-stamp { animation: sealStamp .5s var(--ease-brush); }
+
+/* Responsive */
+@media(min-width: 600px) {
+  .bookmark-grid { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+<canvas id="mountain-canvas"></canvas>
+
+<div id="app">
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div>
+      <div class="ambiance-info">
+        {{ambiance.solar_term}} · {{ambiance.moon_phase}} · {{hourLabel}}
+      </div>
+      <div class="ambiance-poem">「{{ambiance.poem.split(' — ')[0]}}」</div>
+      <div style="font-size:11px;color:var(--lightink)">— {{ambiance.poem.split(' — ')[1] || '佚名'}}</div>
+    </div>
+    <button class="theme-toggle" @click="toggleTheme" :title="theme==='ink'?'切换暗色':'切换亮色'">
+      {{theme==='ink'?'🌙':'☀️'}}
+    </button>
+  </div>
+
+  <!-- OmniBar -->
+  <div class="omni-bar">
+    <span class="omni-icon">🔍</span>
+    <input v-model="searchQuery" @input="onSearch" @keydown.enter="onSearchEnter" placeholder="试墨书山河...">
+    <div class="omni-results" v-if="searchResults.length && searchQuery">
+      <div class="omni-item" v-for="bm in searchResults" :key="bm.id" @click="openUrl(bm)">
+        <span>{{bm.icon}}</span>
+        <span>{{bm.title}}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Categories -->
+  <div class="categories">
+    <div class="cat-pill" :class="{active:activeCat===0}" @click="activeCat=0">🌐 全部</div>
+    <div class="cat-pill" v-for="cat in categories" :class="{active:activeCat===cat.id}" @click="activeCat=cat.id">
+      {{cat.icon}} {{cat.name}}
+    </div>
+    <div class="cat-pill" style="background:transparent;border-style:dashed" @click="showAddCat=true">＋</div>
+  </div>
+
+  <!-- Bookmarks -->
+  <div class="bookmark-grid">
+    <div v-if="filteredBookmarks.length===0" class="empty">
+      此处山河待书<br>
+      <span style="font-size:12px;color:var(--lightink)">点击右下角 + 添加第一个书签</span>
+    </div>
+    <div class="bookmark-card seal-stamp" v-for="bm in filteredBookmarks" :key="bm.id" @click="openUrl(bm)">
+      <span class="bm-icon">{{bm.icon}}</span>
+      <div class="bm-title">{{bm.title}}</div>
+      <div class="bm-url">{{bm.url}}</div>
+      <span class="bm-visit">×{{bm.visit_count}}</span>
+      <button class="bm-delete" @click.stop="delBookmark(bm)">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<div class="fab">
+  <button class="fab-btn" @click="showAddBm=true">＋</button>
+</div>
+
+<!-- Add Bookmark Modal -->
+<div class="overlay" v-if="showAddBm" @click.self="showAddBm=false">
+  <div class="modal">
+    <h3>📜 新添书签</h3>
+    <label>标题</label>
+    <input v-model="newBm.title" placeholder="e.g. 股讯聚合">
+    <label>网址</label>
+    <input v-model="newBm.url" placeholder="https://ct256.cn">
+    <label>图标 Emoji</label>
+    <input v-model="newBm.icon" placeholder="📈">
+    <label>分类</label>
+    <select v-model="newBm.category_id">
+      <option :value="0">未分类</option>
+      <option v-for="cat in categories" :value="cat.id">{{cat.icon}} {{cat.name}}</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn-cancel" @click="showAddBm=false">取消</button>
+      <button class="btn-primary" @click="addBookmark">入墨</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="overlay" v-if="showAddCat" @click.self="showAddCat=false">
+  <div class="modal">
+    <h3>📂 新立分类</h3>
+    <label>名称</label>
+    <input v-model="newCat.name" placeholder="e.g. 开发工具">
+    <label>图标</label>
+    <input v-model="newCat.icon" placeholder="🛠️">
+    <div class="modal-actions">
+      <button class="btn-cancel" @click="showAddCat=false">取消</button>
+      <button class="btn-primary" @click="addCategory">立卷</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://fastly.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const {createApp, ref, reactive, onMounted, computed, nextTick, watch} = Vue;
+
+// ── Mountain Canvas Engine ──────────────────
+function initMountainCanvas(intensity = 0.6) {
+  const canvas = document.getElementById('mountain-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    draw();
+  }
+
+  function noise(x, y) {
+    const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  function smoothNoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const v00 = noise(ix, iy), v10 = noise(ix + 1, iy);
+    const v01 = noise(ix, iy + 1), v11 = noise(ix + 1, iy + 1);
+    return v00 + (v10 - v00) * sx + (v01 - v00) * sy + (v11 - v10 - v01 + v00) * sx * sy;
+  }
+
+  function draw() {
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Sky gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.4);
+    const style = getComputedStyle(document.documentElement);
+    skyGrad.addColorStop(0, style.getPropertyValue('--bg1'));
+    skyGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, w, h * 0.4);
+
+    // Mountains — 5 layers
+    const mountainCount = 5;
+    const baseH = h * 0.55;
+    const inkColor = style.getPropertyValue('--ink');
+
+    for (let layer = 0; layer < mountainCount; layer++) {
+      const alpha = 0.04 + layer * 0.04;
+      const yOffset = baseH + layer * h * 0.08;
+      const scale = 0.01 * (layer + 1);
+      const sharpness = intensity * (1 + layer * 0.3);
+
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+
+      const steps = Math.floor(w / 6);
+      for (let i = 0; i <= steps; i++) {
+        const x = (i / steps) * w;
+        const n1 = smoothNoise(i * scale * 0.5, layer * 1.7) * 0.6;
+        const n2 = smoothNoise(i * scale * 0.3 + 5, layer * 2.1 + 3) * 0.4;
+        let y = yOffset - (n1 + n2) * h * 0.45 * sharpness;
+        if (i === 0 || i === steps) y = yOffset + 20;
+        ctx.lineTo(x, y);
+      }
+
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fillStyle = inkColor.replace(')', `,${alpha})`).replace('rgb', 'rgba');
+      if (inkColor.startsWith('#')) {
+        const r = parseInt(inkColor.slice(1,3), 16);
+        const g = parseInt(inkColor.slice(3,5), 16);
+        const b = parseInt(inkColor.slice(5,7), 16);
+        ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      }
+      ctx.fill();
+    }
+
+    // Mist
+    for (let i = 0; i < 3; i++) {
+      const mistY = h * 0.5 + i * h * 0.08;
+      const mistGrad = ctx.createLinearGradient(0, mistY - 20, 0, mistY + 40);
+      mistGrad.addColorStop(0, 'transparent');
+      mistGrad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+      mistGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = mistGrad;
+      ctx.fillRect(0, mistY - 20, w, 60);
+    }
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Animate subtle movement
+  let offset = 0;
+  function animate() {
+    offset += 0.0002;
+    draw();
+    requestAnimationFrame(animate);
+  }
+  // Uncomment for animation: animate();
+}
+
+// ── Vue App ─────────────────────────────────
+const app = createApp({
+  setup() {
+    const API = '/neunav';
+    const searchQuery = ref('');
+    const searchResults = ref([]);
+    const activeCat = ref(0);
+    const categories = ref([]);
+    const bookmarks = ref([]);
+    const ambiance = reactive({
+      hour: 0, solar_term: '惊蛰', moon_phase: '🌕 望', poem: '行到水穷处，坐看云起时 — 王维',
+      colors: {bg1:'#f0e6d3',bg2:'#d4a574',ink:'#3b2210',accent:'#8b4513'}
+    });
+    const theme = ref('ink');
+    const showAddBm = ref(false);
+    const showAddCat = ref(false);
+    const newBm = reactive({title:'',url:'',icon:'🔗',category_id:0});
+    const newCat = reactive({name:'',icon:'📁'});
+
+    const hourLabel = computed(() => {
+      const h = ambiance.hour;
+      if (h < 6) return '夜深';
+      if (h < 9) return '晨起';
+      if (h < 12) return '上午';
+      if (h < 14) return '正午';
+      if (h < 18) return '午后';
+      if (h < 21) return '黄昏';
+      return '入夜';
+    });
+
+    const filteredBookmarks = computed(() => {
+      if (activeCat.value === 0) return bookmarks.value;
+      return bookmarks.value.filter(b => b.category_id === activeCat.value);
+    });
+
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, { headers: {'Content-Type':'application/json'}, ...opts });
+      return res.json();
+    }
+
+    async function loadAll() {
+      const [a, c, b] = await Promise.all([
+        api('/api/ambiance'), api('/api/categories'), api('/api/bookmarks')
+      ]);
+      if (a) Object.assign(ambiance, a);
+      if (c) categories.value = c.categories;
+      if (b) bookmarks.value = b.bookmarks;
+    }
+
+    async function addBookmark() {
+      await api('/api/bookmarks', { method: 'POST', body: JSON.stringify({...newBm}) });
+      showAddBm.value = false;
+      Object.assign(newBm, {title:'',url:'',icon:'🔗',category_id:0});
+      await loadAll();
+    }
+
+    async function delBookmark(bm) {
+      await api('/api/bookmarks/' + bm.id, { method: 'DELETE' });
+      await loadAll();
+    }
+
+    async function addCategory() {
+      await api('/api/categories', { method: 'POST', body: JSON.stringify({...newCat}) });
+      showAddCat.value = false;
+      Object.assign(newCat, {name:'',icon:'📁'});
+      await loadAll();
+    }
+
+    async function openUrl(bm) {
+      await api('/api/bookmarks/' + bm.id + '/visit', { method: 'PUT' });
+      window.open(bm.url, '_blank');
+      await loadAll();
+    }
+
+    function onSearch() {
+      if (!searchQuery.value) { searchResults.value = []; return; }
+      const q = searchQuery.value.toLowerCase();
+      searchResults.value = bookmarks.value.filter(b =>
+        b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q)
+      ).slice(0, 6);
+    }
+
+    function onSearchEnter() {
+      if (searchResults.value.length) openUrl(searchResults.value[0]);
+    }
+
+    function toggleTheme() {
+      theme.value = theme.value === 'ink' ? 'dark' : 'ink';
+      document.documentElement.setAttribute('data-theme', theme.value);
+      setTimeout(() => initMountainCanvas(0.6), 100);
+    }
+
+    // Apply ambiance colors
+    watch(() => ambiance.colors, (c) => {
+      if (!c) return;
+      const root = document.documentElement;
+      root.style.setProperty('--bg1', c.bg1);
+      root.style.setProperty('--bg2', c.bg2);
+      root.style.setProperty('--ink', c.ink);
+      root.style.setProperty('--accent', c.accent);
+      root.style.setProperty('--lightink', c.ink + '99');
+      root.style.setProperty('--paper', c.bg1 + 'dd');
+      setTimeout(() => initMountainCanvas(0.6), 200);
+    }, { deep: true });
+
+    onMounted(async () => {
+      await loadAll();
+      initMountainCanvas(0.6);
+    });
+
+    return {
+      searchQuery, searchResults, activeCat, categories, bookmarks, ambiance, theme,
+      hourLabel, filteredBookmarks,
+      showAddBm, showAddCat, newBm, newCat,
+      loadAll, addBookmark, delBookmark, addCategory, openUrl,
+      onSearch, onSearchEnter, toggleTheme
+    };
+  }
+});
+app.mount('#app');
+</script>
+</body>
+</html>
