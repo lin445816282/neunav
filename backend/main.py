@@ -67,6 +67,23 @@ def init_db():
     conn.commit()
     conn.close()
 
+# ── Migration: ensure deleted_at columns exist ──
+_mig = get_db()
+try:
+    _mig.execute("ALTER TABLE bookmarks ADD COLUMN deleted_at TEXT")
+except sqlite3.OperationalError:
+    pass
+try:
+    _mig.execute("ALTER TABLE categories ADD COLUMN deleted_at TEXT")
+except sqlite3.OperationalError:
+    pass
+try:
+    _mig.execute("CREATE INDEX IF NOT EXISTS idx_bm_deleted ON bookmarks(deleted_at)")
+except sqlite3.OperationalError:
+    pass
+_mig.commit()
+_mig.close()
+
 init_db()
 
 # ── Ambiance Engine ─────────────────────────
@@ -158,7 +175,7 @@ async def get_ambiance():
 @app.get("/api/categories")
 async def list_categories():
     conn = get_db()
-    rows = [dict(r) for r in conn.execute("SELECT * FROM categories ORDER BY sort_order, id").fetchall()]
+    rows = [dict(r) for r in conn.execute("SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY sort_order, id").fetchall()]
     conn.close()
     return {"categories": rows}
 
@@ -178,8 +195,9 @@ async def add_category(c: CatCreate):
 @app.delete("/api/categories/{cid}")
 async def del_category(cid: int):
     conn = get_db()
-    conn.execute("DELETE FROM bookmarks WHERE category_id=?", (cid,))
-    conn.execute("DELETE FROM categories WHERE id=?", (cid,))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("UPDATE categories SET deleted_at=? WHERE id=?", (now, cid))
+    conn.execute("UPDATE bookmarks SET deleted_at=? WHERE category_id=? AND deleted_at IS NULL", (now, cid))
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -190,13 +208,13 @@ async def list_bookmarks(search: str = "", category_id: int = 0, limit: int = 10
     conn = get_db()
     if search:
         rows = conn.execute(
-            "SELECT * FROM bookmarks WHERE title LIKE ? OR url LIKE ? ORDER BY sort_score DESC, visit_count DESC LIMIT ?",
+            "SELECT * FROM bookmarks WHERE deleted_at IS NULL AND (title LIKE ? OR url LIKE ?) ORDER BY sort_score DESC, visit_count DESC LIMIT ?",
             (f"%{search}%", f"%{search}%", limit)
         ).fetchall()
     elif category_id:
-        rows = conn.execute("SELECT * FROM bookmarks WHERE category_id=? ORDER BY sort_score DESC", (category_id,)).fetchall()
+        rows = conn.execute("SELECT * FROM bookmarks WHERE deleted_at IS NULL AND category_id=? ORDER BY sort_score DESC", (category_id,)).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM bookmarks ORDER BY sort_score DESC, visit_count DESC LIMIT ?", (limit,)).fetchall()
+        rows = conn.execute("SELECT * FROM bookmarks WHERE deleted_at IS NULL ORDER BY sort_score DESC, visit_count DESC LIMIT ?", (limit,)).fetchall()
     conn.close()
     return {"bookmarks": [dict(r) for r in rows]}
 
@@ -233,8 +251,67 @@ async def visit_bookmark(bid: int):
 @app.delete("/api/bookmarks/{bid}")
 async def del_bookmark(bid: int):
     conn = get_db()
-    conn.execute("DELETE FROM bookmarks WHERE id=?", (bid,))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("UPDATE bookmarks SET deleted_at=? WHERE id=?", (now, bid))
     conn.commit()
+    conn.close()
+    return {"ok": True}
+
+class BmUpdate(BaseModel):
+    title: str = None
+    url: str = None
+    icon: str = None
+    category_id: int = None
+
+@app.put("/api/bookmarks/reorder")
+async def reorder_bookmarks(request: Request):
+    body = await request.json()
+    items = body.get("items", [])
+    conn = get_db()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for item in items:
+        conn.execute(
+            "UPDATE bookmarks SET sort_score=?, updated_at=? WHERE id=?",
+            (item["sort_score"], now, item["id"])
+        )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.put("/api/bookmarks/{bid}")
+async def update_bookmark(bid: int, b: BmUpdate):
+    conn = get_db()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sets = []
+    vals = []
+    if b.title is not None: sets.append("title=?"); vals.append(b.title)
+    if b.url is not None: sets.append("url=?"); vals.append(b.url)
+    if b.icon is not None: sets.append("icon=?"); vals.append(b.icon)
+    if b.category_id is not None: sets.append("category_id=?"); vals.append(b.category_id)
+    if sets:
+        sets.append("updated_at=?")
+        vals.append(now)
+        vals.append(bid)
+        conn.execute(f"UPDATE bookmarks SET {', '.join(sets)} WHERE id=?", vals)
+        conn.commit()
+    conn.close()
+    return {"ok": True}
+
+class CatUpdate(BaseModel):
+    name: str = None
+    icon: str = None
+
+@app.put("/api/categories/{cid}")
+async def update_category(cid: int, c: CatUpdate):
+    conn = get_db()
+    sets = []
+    vals = []
+    if c.name is not None: sets.append("name=?"); vals.append(c.name)
+    if c.icon is not None: sets.append("icon=?"); vals.append(c.icon)
+    if sets:
+        vals.append(cid)
+        conn.execute(f"UPDATE categories SET {', '.join(sets)} WHERE id=?", vals)
+        conn.commit()
     conn.close()
     return {"ok": True}
 

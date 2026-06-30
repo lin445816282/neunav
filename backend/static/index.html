@@ -111,6 +111,15 @@ body{
 .cat-pill.active {
   background: var(--ink); color: var(--bg1); border-color: var(--ink);
 }
+.cat-count {
+  margin-left: 4px; font-size: 11px; font-weight: 700;
+  background: var(--accent); color: #fff;
+  padding: 1px 7px; border-radius: 10px;
+  line-height: 1.4; vertical-align: middle;
+}
+.cat-pill.active .cat-count {
+  background: var(--seal); color: #fff;
+}
 
 /* Bookmark Grid */
 .bookmark-grid {
@@ -127,6 +136,35 @@ body{
 }
 .bookmark-card:active { transform: scale(0.96); }
 .bookmark-card:hover { box-shadow: var(--shadow-ink); transform: scale(1.03); }
+.bookmark-card.selected {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px rgba(139,69,19,0.15);
+}
+.bookmark-card.dragging {
+  z-index: 50 !important;
+  opacity: 0.85;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.3) !important;
+  transition: none !important;
+  pointer-events: none;
+  touch-action: none;
+}
+.bookmark-card.drag-placeholder {
+  opacity: 0.3;
+  border-style: dashed;
+  background: rgba(139,69,19,0.06);
+}
+body.drag-scrolling { overflow: hidden !important; }
+.bm-actions {
+  display: flex; gap: 8px; margin-top: 10px;
+  padding-top: 10px; border-top: 1px solid rgba(139,90,43,0.12);
+}
+.bm-actions button {
+  flex: 1; padding: 8px 0; border-radius: 8px;
+  border: none; font-size: 12px; cursor: pointer;
+  font-family: 'Noto Serif SC', serif;
+  background: var(--bg1); color: var(--ink);
+}
+.bm-actions button:active { background: var(--accent); color: #fff; }
 .bm-icon {
   font-size: 28px; margin-bottom: 8px; display: block;
 }
@@ -142,12 +180,13 @@ body{
   position: absolute; top: 8px; right: 8px;
   font-size: 10px; color: var(--lightink);
 }
-.bm-delete {
+.bm-edit {
   position: absolute; bottom: 8px; right: 8px;
   font-size: 14px; opacity: 0; transition: opacity .2s;
-  color: var(--seal); cursor: pointer; background: none; border: none;
+  color: var(--accent); cursor: pointer; background: none; border: none;
 }
-.bookmark-card:hover .bm-delete { opacity: 1; }
+.bookmark-card:hover .bm-edit { opacity: 1; }
+.bookmark-card:active .bm-edit { opacity: 1; }
 
 /* FAB */
 .fab {
@@ -281,10 +320,13 @@ body{
 
   <!-- Categories -->
   <div class="categories">
-    <div class="cat-pill" :class="{active:activeCat===0}" @click="activeCat=0">🌐 全部</div>
-    <div class="cat-pill" v-for="cat in categories" :class="{active:activeCat===cat.id}" @click="activeCat=cat.id">
+    <div class="cat-pill" :class="{active:activeCat===0}" @click="activeCat=0">🌐 全部<span class="cat-count">{{bookmarks.length}}</span></div>
+    <div class="cat-pill" v-for="cat in categories" :class="{active:activeCat===cat.id}"
+      @click="activeCat=cat.id"
+      @touchstart="startCatLongPress($event, cat)" @touchend="cancelLongPress" @touchmove="cancelLongPress">
       {{cat.icon}} {{cat.name}}
-      <span @click.stop="delCategory(cat)" style="margin-left:6px;opacity:0.4;font-size:12px;cursor:pointer">✕</span>
+      <span class="cat-count">{{bookmarks.filter(b=>b.category_id===cat.id).length}}</span>
+      <span @click.stop="startEditCat(cat)" style="margin-left:6px;opacity:0.4;font-size:12px;cursor:pointer">✎</span>
     </div>
     <div class="cat-pill" style="background:transparent;border-style:dashed" @click="showAddCat=true">＋</div>
   </div>
@@ -295,12 +337,21 @@ body{
       此处山河待书<br>
       <span style="font-size:12px;color:var(--lightink)">点击右下角 + 添加第一个书签</span>
     </div>
-    <div class="bookmark-card seal-stamp" v-for="bm in filteredBookmarks" :key="bm.id" @click="openUrl(bm)">
+    <div class="bookmark-card seal-stamp" v-for="bm in filteredBookmarks" :key="bm.id"
+      :class="{selected: selectedBmId === bm.id, dragging: dragState.active && dragState.bmId === bm.id}"
+      :style="dragState.active && dragState.bmId === bm.id ? {transform: 'translate('+dragState.deltaX+'px,'+dragState.deltaY+'px) scale(1.05)', zIndex:50} : {}"
+      :data-bmid="bm.id"
+      @touchstart="onCardTouchStart($event, bm)" @touchmove="onCardTouchMove($event)" @touchend="onCardTouchEnd"
+      @click="handleBmTap($event, bm)">
       <span class="bm-icon">{{bm.icon}}</span>
       <div class="bm-title">{{bm.title}}</div>
       <div class="bm-url">{{bm.url}}</div>
       <span class="bm-visit">×{{bm.visit_count}}</span>
-      <button class="bm-delete" @click.stop="delBookmark(bm)">✕</button>
+      <button class="bm-edit" @click.stop="startEditBm(bm)">✎</button>
+      <div class="bm-actions" v-if="selectedBmId === bm.id">
+        <button @click.stop="startEditBm(bm)">✎ 编辑</button>
+        <button @click.stop="delBookmark(bm)">🗑 删除</button>
+      </div>
     </div>
   <!-- FAB -->
   <div class="fab">
@@ -359,10 +410,55 @@ body{
       </div>
       <div class="icon-sheet-grid">
         <div class="icon-option" v-for="icon in iconList" :key="icon"
-          :class="{selected: iconPickerTarget==='bm' ? newBm.icon===icon : newCat.icon===icon}"
+          :class="{selected: iconPickerTarget==='bm' ? newBm.icon===icon : iconPickerTarget==='cat' ? newCat.icon===icon : iconPickerTarget==='edit' ? editBm.icon===icon : editCat.icon===icon}"
           @click="selectIcon(icon)">
           {{icon}}
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Bookmark Modal -->
+  <div class="overlay" v-if="editingBm" @click.self="editingBm=null">
+    <div class="modal">
+      <h3>✎ 修改书签</h3>
+      <label>标题</label>
+      <input v-model="editBm.title">
+      <label>网址</label>
+      <input v-model="editBm.url">
+      <label>图标</label>
+      <div class="icon-pick-trigger" @click="openIconPicker('edit')">
+        <span class="icon-pick-preview">{{editBm.icon}}</span>
+        <span class="icon-pick-label">点击选择图标</span>
+      </div>
+      <label>分类</label>
+      <select v-model="editBm.category_id">
+        <option :value="0">未分类</option>
+        <option v-for="cat in categories" :value="cat.id">{{cat.icon}} {{cat.name}}</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" @click="delBookmark(editingBm);editingBm=null">删除</button>
+        <button class="btn-cancel" @click="editingBm=null">取消</button>
+        <button class="btn-primary" @click="saveBmEdit">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Category Modal -->
+  <div class="overlay" v-if="editingCat" @click.self="editingCat=null">
+    <div class="modal">
+      <h3>✎ 修改分类</h3>
+      <label>名称</label>
+      <input v-model="editCat.name">
+      <label>图标</label>
+      <div class="icon-pick-trigger" @click="openIconPicker('editcat')">
+        <span class="icon-pick-preview">{{editCat.icon}}</span>
+        <span class="icon-pick-label">点击选择图标</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" @click="delCategory(editingCat);editingCat=null">删除</button>
+        <button class="btn-cancel" @click="editingCat=null">取消</button>
+        <button class="btn-primary" @click="saveCatEdit">保存</button>
       </div>
     </div>
   </div>
@@ -372,7 +468,7 @@ body{
 <script>
 const {createApp, ref, reactive, onMounted, computed, nextTick, watch} = Vue;
 
-// ── Mountain Canvas Engine ──────────────────
+    // ── Mountain Canvas Engine ──────────────────
 function initMountainCanvas(intensity = 0.6) {
   const canvas = document.getElementById('mountain-canvas');
   if (!canvas) return;
@@ -481,6 +577,14 @@ const app = createApp({
     const activeCat = ref(0);
     const categories = ref([]);
     const bookmarks = ref([]);
+    const dragState = reactive({
+      active: false,
+      bmId: null,
+      startX: 0, startY: 0,
+      deltaX: 0, deltaY: 0,
+      targetIndex: -1,
+      lastSwapTime: 0
+    });
     const ambiance = reactive({
       hour: 0, solar_term: '惊蛰', moon_phase: '🌕 望', poem: '行到水穷处，坐看云起时 — 王维',
       colors: {bg1:'#f0e6d3',bg2:'#d4a574',ink:'#3b2210',accent:'#8b4513'}
@@ -508,7 +612,9 @@ const app = createApp({
     }
     function selectIcon(icon) {
       if (iconPickerTarget.value === 'bm') newBm.icon = icon;
-      else newCat.icon = icon;
+      else if (iconPickerTarget.value === 'cat') newCat.icon = icon;
+      else if (iconPickerTarget.value === 'edit') editBm.icon = icon;
+      else if (iconPickerTarget.value === 'editcat') editCat.icon = icon;
       showIconPicker.value = false;
     }
 
@@ -609,6 +715,163 @@ const app = createApp({
       setTimeout(() => initMountainCanvas(0.6), 200);
     }, { deep: true });
 
+    // Drag-to-reorder on selected cards
+    function onCardTouchStart(e, bm) {
+      if (selectedBmId.value === bm.id) {
+        const touch = e.touches[0];
+        dragState.bmId = bm.id;
+        dragState.startX = touch.clientX;
+        dragState.startY = touch.clientY;
+        dragState.deltaX = 0;
+        dragState.deltaY = 0;
+        dragState.active = false;
+        dragState.targetIndex = -1;
+        dragState.lastSwapTime = 0;
+      }
+      startLongPress(e, bm);
+    }
+
+    function onCardTouchMove(e) {
+      if (dragState.bmId) {
+        const touch = e.touches[0];
+        const dx = touch.clientX - dragState.startX;
+        const dy = touch.clientY - dragState.startY;
+        if (!dragState.active && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+          cancelLongPress();
+          dragState.active = true;
+          dragState.targetIndex = bookmarks.value.findIndex(b => b.id === dragState.bmId);
+          document.body.classList.add('drag-scrolling');
+          e.preventDefault();
+        }
+        if (dragState.active) {
+          e.preventDefault();
+          dragState.deltaX = dx;
+          dragState.deltaY = dy;
+          // Edge auto-scroll — only when touch is near top/bottom of viewport
+          const EDGE = 60;
+          const SCROLL_SPEED = 8;
+          const vh = window.innerHeight;
+          if (touch.clientY < EDGE) {
+            // Near top edge — scroll up
+            const pct = 1 - touch.clientY / EDGE; // 1 at y=0, 0 at y=EDGE
+            window.scrollBy(0, -(SCROLL_SPEED * pct));
+          } else if (touch.clientY > vh - EDGE) {
+            // Near bottom edge — scroll down
+            const pct = (touch.clientY - (vh - EDGE)) / EDGE; // 0 at vh-EDGE, 1 at vh
+            window.scrollBy(0, SCROLL_SPEED * pct);
+          }
+          // Throttled swap — find closest card by touch position
+          const now = Date.now();
+          if (now - dragState.lastSwapTime > 120) {
+            const cards = Array.from(document.querySelectorAll('.bookmark-card'));
+            let bestIdx = -1;
+            let bestDist = Infinity;
+            cards.forEach(card => {
+              const rect = card.getBoundingClientRect();
+              const cx = rect.left + rect.width / 2;
+              const cy = rect.top + rect.height / 2;
+              const dist = Math.hypot(touch.clientX - cx, touch.clientY - cy);
+              if (dist < bestDist) {
+                bestDist = dist;
+                const bmId = parseInt(card.dataset.bmid);
+                bestIdx = bookmarks.value.findIndex(b => b.id === bmId);
+              }
+            });
+            if (bestIdx !== -1 && bestIdx !== dragState.targetIndex) {
+              const currentIdx = bookmarks.value.findIndex(b => b.id === dragState.bmId);
+              if (currentIdx !== -1 && currentIdx !== bestIdx) {
+                const arr = [...bookmarks.value];
+                [arr[currentIdx], arr[bestIdx]] = [arr[bestIdx], arr[currentIdx]];
+                bookmarks.value = arr;
+                dragState.targetIndex = bestIdx;
+                dragState.lastSwapTime = now;
+              }
+            }
+          }
+        }
+      }
+      cancelLongPress();
+    }
+
+    function onCardTouchEnd() {
+      if (dragState.active) {
+        const items = bookmarks.value.map((b, i) => ({
+          id: b.id,
+          sort_score: -i
+        }));
+        api('/api/bookmarks/reorder', { method: 'PUT', body: JSON.stringify({ items }) });
+        document.body.classList.remove('drag-scrolling');
+      }
+      dragState.bmId = null;
+      dragState.active = false;
+      cancelLongPress();
+    }
+
+    // Tap behavior: single=select, double=navigate
+    const selectedBmId = ref(null);
+    let tapTimer = null;
+
+    function handleBmTap(e, bm) {
+      if (tapTimer) {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+        selectedBmId.value = null;
+        openUrl(bm);
+      } else {
+        tapTimer = setTimeout(() => {
+          tapTimer = null;
+          if (selectedBmId.value === bm.id) {
+            selectedBmId.value = null;
+          } else {
+            selectedBmId.value = bm.id;
+          }
+        }, 300);
+      }
+    }
+
+    // Edit state
+    const editingBm = ref(null);
+    const editBm = reactive({title:'',url:'',icon:'',category_id:0});
+    const editingCat = ref(null);
+    const editCat = reactive({name:'',icon:''});
+
+    let longPressTimer = null;
+    const LONG_PRESS_DURATION = 600;
+
+    function startLongPress(e, bm) {
+      longPressTimer = setTimeout(() => { startEditBm(bm); }, LONG_PRESS_DURATION);
+    }
+    function startCatLongPress(e, cat) {
+      longPressTimer = setTimeout(() => { startEditCat(cat); }, LONG_PRESS_DURATION);
+    }
+    function cancelLongPress() {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    }
+
+    function startEditBm(bm) {
+      cancelLongPress();
+      editingBm.value = bm;
+      Object.assign(editBm, {title:bm.title, url:bm.url, icon:bm.icon, category_id:bm.category_id});
+    }
+    function startEditCat(cat) {
+      cancelLongPress();
+      editingCat.value = cat;
+      Object.assign(editCat, {name:cat.name, icon:cat.icon});
+    }
+
+    async function saveBmEdit() {
+      if (!editBm.title.trim()) return;
+      await api('/api/bookmarks/' + editingBm.value.id, { method: 'PUT', body: JSON.stringify({...editBm}) });
+      editingBm.value = null;
+      await loadAll();
+    }
+    async function saveCatEdit() {
+      if (!editCat.name.trim()) return;
+      await api('/api/categories/' + editingCat.value.id, { method: 'PUT', body: JSON.stringify({...editCat}) });
+      editingCat.value = null;
+      await loadAll();
+    }
+
     onMounted(async () => {
       await loadAll();
       initMountainCanvas(0.6);
@@ -618,7 +881,12 @@ const app = createApp({
       searchQuery, searchResults, activeCat, categories, bookmarks, ambiance, theme,
       hourLabel, filteredBookmarks,
       showAddBm, showAddCat, newBm, newCat,
+      editingBm, editBm, editingCat, editCat,
       showIconPicker, iconPickerTarget, iconList, openIconPicker, selectIcon,
+      selectedBmId, handleBmTap,
+      dragState, onCardTouchStart, onCardTouchMove, onCardTouchEnd,
+      startLongPress, startCatLongPress, cancelLongPress,
+      startEditBm, startEditCat, saveBmEdit, saveCatEdit,
       loadAll, addBookmark, delBookmark, delCategory, addCategory, openUrl,
       onSearch, onSearchEnter, toggleTheme
     };
