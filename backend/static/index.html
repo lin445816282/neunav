@@ -188,6 +188,47 @@ body{
 .btn-primary { background: var(--ink); color: var(--bg1); }
 .btn-cancel { background: transparent; color: var(--lightink); border: 1px solid var(--lightink) !important; }
 
+/* Icon Picker */
+.icon-pick-trigger {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  padding: 10px 14px; border-radius: 8px;
+  border: 2px dashed var(--lightink); background: var(--bg1);
+  cursor: pointer; transition: border-color .2s;
+}
+.icon-pick-trigger:active { border-color: var(--accent); }
+.icon-pick-preview { font-size: 32px; line-height: 1; }
+.icon-pick-label { font-size: 13px; color: var(--lightink); }
+
+.icon-sheet {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(30,20,10,0.5);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.icon-sheet-inner {
+  background: var(--paper); border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 480px; max-height: 60vh;
+  display: flex; flex-direction: column;
+  animation: slideUp .25s var(--ease-brush);
+}
+.icon-sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid rgba(139,90,43,0.1);
+  font-size: 14px; color: var(--ink); font-weight: 600;
+}
+.icon-sheet-close { font-size: 20px; cursor: pointer; color: var(--lightink); padding: 4px; }
+.icon-sheet-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+  padding: 16px; overflow-y: auto; flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+.icon-option {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; border-radius: 12px; cursor: pointer;
+  transition: background .15s, transform .15s;
+}
+.icon-option:active { background: rgba(139,90,43,0.1); transform: scale(1.15); }
+.icon-option.selected { background: rgba(139,90,43,0.15); box-shadow: 0 0 0 2px var(--accent); }
+
 /* Empty state */
 .empty {
   text-align: center; padding: 60px 20px; color: var(--lightink);
@@ -243,6 +284,7 @@ body{
     <div class="cat-pill" :class="{active:activeCat===0}" @click="activeCat=0">🌐 全部</div>
     <div class="cat-pill" v-for="cat in categories" :class="{active:activeCat===cat.id}" @click="activeCat=cat.id">
       {{cat.icon}} {{cat.name}}
+      <span @click.stop="delCategory(cat)" style="margin-left:6px;opacity:0.4;font-size:12px;cursor:pointer">✕</span>
     </div>
     <div class="cat-pill" style="background:transparent;border-style:dashed" @click="showAddCat=true">＋</div>
   </div>
@@ -260,47 +302,68 @@ body{
       <span class="bm-visit">×{{bm.visit_count}}</span>
       <button class="bm-delete" @click.stop="delBookmark(bm)">✕</button>
     </div>
+  <!-- FAB -->
+  <div class="fab">
+    <button class="fab-btn" @click="showAddBm=true">＋</button>
   </div>
-</div>
 
-<!-- FAB -->
-<div class="fab">
-  <button class="fab-btn" @click="showAddBm=true">＋</button>
-</div>
-
-<!-- Add Bookmark Modal -->
-<div class="overlay" v-if="showAddBm" @click.self="showAddBm=false">
-  <div class="modal">
-    <h3>📜 新添书签</h3>
-    <label>标题</label>
-    <input v-model="newBm.title" placeholder="e.g. 股讯聚合">
-    <label>网址</label>
-    <input v-model="newBm.url" placeholder="https://ct256.cn">
-    <label>图标 Emoji</label>
-    <input v-model="newBm.icon" placeholder="📈">
-    <label>分类</label>
-    <select v-model="newBm.category_id">
-      <option :value="0">未分类</option>
-      <option v-for="cat in categories" :value="cat.id">{{cat.icon}} {{cat.name}}</option>
-    </select>
-    <div class="modal-actions">
-      <button class="btn-cancel" @click="showAddBm=false">取消</button>
-      <button class="btn-primary" @click="addBookmark">入墨</button>
+  <!-- Add Bookmark Modal -->
+  <div class="overlay" v-if="showAddBm" @click.self="showAddBm=false">
+    <div class="modal">
+      <h3>📜 新添书签</h3>
+      <label>标题</label>
+      <input v-model="newBm.title" placeholder="e.g. 股讯聚合">
+      <label>网址</label>
+      <input v-model="newBm.url" placeholder="https://ct256.cn">
+      <label>图标</label>
+      <div class="icon-pick-trigger" @click="openIconPicker('bm')">
+        <span class="icon-pick-preview">{{newBm.icon}}</span>
+        <span class="icon-pick-label">点击选择图标</span>
+      </div>
+      <label>分类</label>
+      <select v-model="newBm.category_id">
+        <option :value="0">未分类</option>
+        <option v-for="cat in categories" :value="cat.id">{{cat.icon}} {{cat.name}}</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" @click="showAddBm=false">取消</button>
+        <button class="btn-primary" @click="addBookmark">入墨</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Add Category Modal -->
-<div class="overlay" v-if="showAddCat" @click.self="showAddCat=false">
-  <div class="modal">
-    <h3>📂 新立分类</h3>
-    <label>名称</label>
-    <input v-model="newCat.name" placeholder="e.g. 开发工具">
-    <label>图标</label>
-    <input v-model="newCat.icon" placeholder="🛠️">
-    <div class="modal-actions">
-      <button class="btn-cancel" @click="showAddCat=false">取消</button>
-      <button class="btn-primary" @click="addCategory">立卷</button>
+  <!-- Add Category Modal -->
+  <div class="overlay" v-if="showAddCat" @click.self="showAddCat=false">
+    <div class="modal">
+      <h3>📂 新立分类</h3>
+      <label>名称</label>
+      <input v-model="newCat.name" placeholder="e.g. 开发工具">
+      <label>图标</label>
+      <div class="icon-pick-trigger" @click="openIconPicker('cat')">
+        <span class="icon-pick-preview">{{newCat.icon}}</span>
+        <span class="icon-pick-label">点击选择图标</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" @click="showAddCat=false">取消</button>
+        <button class="btn-primary" @click="addCategory">立卷</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Icon Picker Sheet -->
+  <div class="icon-sheet" v-if="showIconPicker" @click.self="showIconPicker=false">
+    <div class="icon-sheet-inner">
+      <div class="icon-sheet-header">
+        <span>选择图标</span>
+        <span class="icon-sheet-close" @click="showIconPicker=false">✕</span>
+      </div>
+      <div class="icon-sheet-grid">
+        <div class="icon-option" v-for="icon in iconList" :key="icon"
+          :class="{selected: iconPickerTarget==='bm' ? newBm.icon===icon : newCat.icon===icon}"
+          @click="selectIcon(icon)">
+          {{icon}}
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -428,6 +491,27 @@ const app = createApp({
     const newBm = reactive({title:'',url:'',icon:'🔗',category_id:0});
     const newCat = reactive({name:'',icon:'📁'});
 
+    // Icon Picker
+    const showIconPicker = ref(false);
+    const iconPickerTarget = ref('bm');
+    const iconList = ['📁','🔗','🌐','📊','📈','💰','🏠','⚙️','🛠️','🎮',
+      '🎨','📝','📚','🎵','📷','🎬','🏪','🛒','💼','🔧',
+      '💡','🔥','⭐','❤️','💎','🚀','🎯','📌','🔔','📧',
+      '💬','🗂️','📋','🔍','🧩','🎪','🏆','🌟','🎉','🎁',
+      '🍵','☕','📱','💻','🖥️','⌨️','🖱️','🔌','📡','🗺️',
+      '🏦','💳','📦','🚚','🎓','📖','✏️','🧮','🔬','⚡',
+      '🌿','🌸','🪷','🎋','🏔️','🌊']; // 63 icons, 7×9 grid
+
+    function openIconPicker(target) {
+      iconPickerTarget.value = target;
+      showIconPicker.value = true;
+    }
+    function selectIcon(icon) {
+      if (iconPickerTarget.value === 'bm') newBm.icon = icon;
+      else newCat.icon = icon;
+      showIconPicker.value = false;
+    }
+
     const hourLabel = computed(() => {
       const h = ambiance.hour;
       if (h < 6) return '夜深';
@@ -466,7 +550,15 @@ const app = createApp({
     }
 
     async function delBookmark(bm) {
+      if (!confirm(`删除书签「${bm.title}」？`)) return;
       await api('/api/bookmarks/' + bm.id, { method: 'DELETE' });
+      await loadAll();
+    }
+
+    async function delCategory(cat) {
+      if (!confirm(`删除分类「${cat.name}」及其全部书签？`)) return;
+      await api('/api/categories/' + cat.id, { method: 'DELETE' });
+      if (activeCat.value === cat.id) activeCat.value = 0;
       await loadAll();
     }
 
@@ -498,6 +590,9 @@ const app = createApp({
     function toggleTheme() {
       theme.value = theme.value === 'ink' ? 'dark' : 'ink';
       document.documentElement.setAttribute('data-theme', theme.value);
+      // 清除行内样式，让 CSS [data-theme] 规则生效
+      const root = document.documentElement;
+      ['--bg1','--bg2','--ink','--accent','--lightink','--paper'].forEach(v => root.style.removeProperty(v));
       setTimeout(() => initMountainCanvas(0.6), 100);
     }
 
@@ -523,7 +618,8 @@ const app = createApp({
       searchQuery, searchResults, activeCat, categories, bookmarks, ambiance, theme,
       hourLabel, filteredBookmarks,
       showAddBm, showAddCat, newBm, newCat,
-      loadAll, addBookmark, delBookmark, addCategory, openUrl,
+      showIconPicker, iconPickerTarget, iconList, openIconPicker, selectIcon,
+      loadAll, addBookmark, delBookmark, delCategory, addCategory, openUrl,
       onSearch, onSearchEnter, toggleTheme
     };
   }
