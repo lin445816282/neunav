@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>猜差价</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  background:#fafafa;color:#1e293b;height:100%;
+  display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;
+}
+.topbar{display:flex;align-items:center;justify-content:center;padding:14px 24px 6px;gap:20px;flex-shrink:0}
+.dots{display:flex;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#e2e8f0;transition:all .3s}
+.dot.done{background:#0ea5e9}
+.dot.current{background:#0ea5e9;box-shadow:0 0 6px rgba(14,165,233,.5);animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}}
+
+.streak-badge{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:#f59e0b;opacity:0;transform:scale(.5);transition:all .3s cubic-bezier(.16,1,.3,1)}
+.streak-badge.show{opacity:1;transform:scale(1)}
+.streak-badge .flame{font-size:18px;display:inline-block}
+.streak-badge.big .flame{font-size:22px;animation:flamePulse .6s infinite alternate}
+.streak-badge.mega{color:#ef4444}
+.streak-badge.mega .flame{font-size:26px;animation:flamePulse .4s infinite alternate;filter:drop-shadow(0 0 6px #f59e0b)}
+@keyframes flamePulse{from{transform:scale(1)}to{transform:scale(1.3)}}
+
+/* 标题提示 */
+.prompt{text-align:center;padding:4px 24px 2px;flex-shrink:0}
+.prompt-title{font-size:18px;font-weight:800;color:#0f172a}
+.prompt-sub{font-size:13px;color:#94a3b8;margin-top:2px}
+
+.card-area{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 20px 12px;min-height:0}
+.card{flex:1;max-width:170px;aspect-ratio:3/4;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;position:relative;transition:transform .15s,box-shadow .15s,opacity .2s;-webkit-tap-highlight-color:transparent}
+.card:active{transform:scale(.96)!important;box-shadow:0 4px 20px rgba(0,0,0,.12)!important}
+.card.dim{opacity:.45;transform:scale(.97)}
+.card.correct{box-shadow:0 0 0 3px #10b981,0 4px 24px rgba(16,185,129,.25)!important}
+.card-img{flex:1;display:flex;align-items:center;justify-content:center;font-size:48px;position:relative;overflow:hidden}
+.card-price{height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#0f172a;position:relative;transition:color .3s}
+.card-price.correct-price{color:#10b981}
+.card-name{padding:0 10px 10px;font-size:12px;color:#64748b;text-align:center;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+.card.suspense .card-price{color:#94a3b8}
+.card.suspense .card-price::after{content:'¥???';position:absolute;animation:breathe 1.5s infinite}
+@keyframes breathe{0%,100%{opacity:.4;transform:scale(.95)}50%{opacity:1;transform:scale(1.05)}}
+
+.feedback{text-align:center;padding:0 24px 8px;min-height:44px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.feedback-text{font-size:15px;color:#64748b;transition:all .3s;font-weight:600}
+.feedback-text.correct{color:#10b981}
+.feedback-text.nearmiss{color:#f59e0b}
+.feedback-sub{font-size:12px;color:#94a3b8;margin-top:2px}
+
+.score-pop{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);font-size:32px;font-weight:900;color:#10b981;pointer-events:none;z-index:10;animation:popUp .8s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes popUp{0%{opacity:1;transform:translate(-50%,-50%) scale(.5)}50%{opacity:1;transform:translate(-50%,-60%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-90%) scale(1)}}
+
+/* 引导浮层 */
+.onboard{position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:50;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
+.onboard.show{opacity:1;pointer-events:auto}
+.onboard-box{background:#fff;border-radius:20px;padding:28px 24px 24px;text-align:center;max-width:300px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+.onboard-box h2{font-size:22px;font-weight:800;margin-bottom:4px;color:#0f172a}
+.onboard-box p{font-size:14px;color:#64748b;line-height:1.6;margin-bottom:8px}
+.onboard-box .demo{display:flex;gap:8px;justify-content:center;margin:12px 0}
+.onboard-box .demo-card{width:100px;aspect-ratio:3/4;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden;font-size:12px}
+.onboard-box .demo-card .dimg{flex:1;display:flex;align-items:center;justify-content:center;font-size:32px}
+.onboard-box .demo-card .dprice{height:36px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+.onboard-box .demo-card .dname{padding:0 6px 8px;text-align:center;color:#64748b;font-size:10px;line-height:1.2}
+.onboard-box .arrow-hint{font-size:13px;color:#0ea5e9;font-weight:700;margin:8px 0;animation:bounce 1.5s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.onboard-box .btn-start{width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:12px}
+.onboard-box .btn-start:active{transform:scale(.97)}
+
+.settlement{position:fixed;inset:0;background:rgba(255,255,255,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;opacity:0;pointer-events:none;transition:opacity .5s;padding:32px 24px}
+.settlement.show{opacity:1;pointer-events:auto}
+.settlement .icon{font-size:56px;margin-bottom:8px}
+.settlement .score{font-size:64px;font-weight:900;color:#0f172a;line-height:1}
+.settlement .stats{display:flex;gap:20px;margin:16px 0;font-size:14px;color:#64748b}
+.settlement .stats b{color:#0f172a}
+.settlement .rank{font-size:13px;color:#94a3b8;margin-bottom:20px}
+.settlement .btn{width:100%;max-width:300px;padding:14px;border-radius:14px;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;transition:all .2s}
+.settlement .btn:active{transform:scale(.97)}
+.btn-revenge{background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3)}
+.btn-replay{background:#fff;color:#0ea5e9;border:2px solid #0ea5e9}
+.btn-share{background:none;color:#94a3b8;border:none;font-size:14px;font-weight:500}
+.perfect-tag{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#fff;padding:4px 16px;border-radius:20px;font-size:14px;font-weight:700;margin-bottom:12px;animation:popUp .5s .3s both}
+
+.confetti-piece{position:fixed;width:10px;height:10px;z-index:30;pointer-events:none;animation:confettiFall 3s cubic-bezier(.25,.46,.45,.94) forwards}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:0}}
+
+@media(max-width:360px){
+  .card-area{padding:6px 12px 10px;gap:8px}
+  .card{max-width:150px;border-radius:14px}
+  .card-price{height:40px;font-size:20px}
+  .card-name{font-size:11px}
+  .prompt-title{font-size:16px}
+  .settlement .score{font-size:52px}
+}
+@media(min-width:420px){.card-area{padding:12px 32px 16px;gap:14px}.card{max-width:185px;border-radius:18px}}
+/* 返回导航 — 可拖拽 */
+.back-nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;
+  display:flex;align-items:center;gap:6px;touch-action:none;cursor:grab;user-select:none;
+  background:linear-gradient(135deg,rgba(99,102,241,.20),rgba(6,182,212,.14));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-radius:22px;padding:4px 6px;
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 2px 16px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.04);
+  transition:box-shadow .2s,opacity .3s}
+.back-nav:active{cursor:grabbing;box-shadow:0 4px 24px rgba(99,102,241,.15),inset 0 1px 0 rgba(255,255,255,.04)}
+.back-nav.hide{opacity:0;pointer-events:none}
+.back-nav .bn-link{color:#000;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:4px;font-weight:600;white-space:nowrap;letter-spacing:.3px}
+.back-nav .bn-divider{width:1px;height:14px;background:rgba(0,0,0,.08);border-radius:1px}
+.back-nav .bn-close{width:22px;height:22px;border-radius:50%;border:none;
+  background:rgba(0,0,0,.06);color:#000;font-size:12px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.back-nav .bn-close:hover{background:rgba(0,0,0,.10);color:#000}
+</style>
+</head>
+<body>
+<div class="back-nav" id="backNav">
+  <a href="/nav" class="bn-link">🏠 导航</a>
+  <span class="bn-divider"></span>
+  <button class="bn-close" id="bnClose">×</button>
+</div>
+
+<div class="topbar" id="topbar">
+  <div class="dots" id="dots"></div>
+  <div class="streak-badge" id="streakBadge"><span class="flame">🔥</span><span id="streakNum"></span></div>
+</div>
+
+<div class="prompt">
+  <div class="prompt-title" id="promptTitle">哪个更贵？</div>
+  <div class="prompt-sub" id="promptSub">点击你认为价格更高的商品</div>
+</div>
+
+<div class="card-area" id="cardArea">
+  <div class="card" id="cardA" data-side="a">
+    <div class="card-img" id="imgA"></div>
+    <div class="card-price" id="priceA"></div>
+    <div class="card-name" id="nameA"></div>
+  </div>
+  <div class="card" id="cardB" data-side="b">
+    <div class="card-img" id="imgB"></div>
+    <div class="card-price" id="priceB"></div>
+    <div class="card-name" id="nameB"></div>
+  </div>
+</div>
+
+<div class="feedback" id="feedback">
+  <div class="feedback-text" id="feedbackText"></div>
+  <div class="feedback-sub" id="feedbackSub"></div>
+</div>
+
+<!-- 引导浮层 -->
+<div class="onboard show" id="onboard">
+  <div class="onboard-box">
+    <h2>🛍️ 猜差价</h2>
+    <p>两张商品图，哪个更贵？<br>考验你的价格嗅觉</p>
+    <div class="demo">
+      <div class="demo-card"><div class="dimg" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe)">🎧</div><div class="dprice" style="color:#10b981">¥299</div><div class="dname">品牌耳机</div></div>
+      <div class="demo-card"><div class="dimg" style="background:linear-gradient(135deg,#fef3c7,#fde68a)">🎧</div><div class="dprice">¥39</div><div class="dname">杂牌耳机</div></div>
+    </div>
+    <div class="arrow-hint">👆 点击更贵的那个</div>
+    <p style="font-size:12px;color:#94a3b8">10题一局 · 1分钟搞定</p>
+    <button class="btn-start" id="btnStart">开始 →</button>
+  </div>
+</div>
+
+<!-- 结算页 -->
+<div class="settlement" id="settlement">
+  <div class="icon" id="settleIcon">🎉</div>
+  <div id="perfectTag"></div>
+  <div class="score" id="settleScore">0</div>
+  <div class="stats">
+    <span>✔ <b id="settleCorrect">0</b>/10</span>
+    <span>🔥 <b id="settleStreak">0</b></span>
+  </div>
+  <div class="rank" id="settleRank"></div>
+  <button class="btn btn-revenge" id="btnRevenge" style="display:none">🔥 复仇模式</button>
+  <button class="btn btn-replay" id="btnReplay">🔄 再来一局</button>
+  <button class="btn btn-share" id="btnShare">📤 炫耀战绩</button>
+</div>
+
+<script>
+// ═══════ 返回导航拖拽 ═══════
+(function(){
+  const nav=document.getElementById('backNav');
+  const close=document.getElementById('bnClose');
+  let dragging=false,ox=0,oy=0,nx=0,ny=0;
+  close.addEventListener('click',e=>{e.stopPropagation();nav.classList.add('hide')});
+  nav.addEventListener('pointerdown',e=>{
+    if(e.target===close)return;
+    dragging=true;nav.style.transition='none';
+    const r=nav.getBoundingClientRect();
+    ox=e.clientX-r.left;oy=e.clientY-r.top;
+    nav.setPointerCapture(e.pointerId);
+  });
+  nav.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    nx=e.clientX-ox;ny=e.clientY-oy;
+    nav.style.left=nx+'px';nav.style.top=ny+'px';nav.style.transform='none';
+  });
+  nav.addEventListener('pointerup',()=>{
+    dragging=false;nav.style.transition='box-shadow .2s,opacity .3s';
+  });
+})();
+
+// ═══════ 题库（40道，每局随机抽10道按情绪曲线排列） ═══════
+const POOL = [
+  // easy (14道)
+  {a:{name:'QCY T13 蓝牙耳机',bg:'#dbeafe',emoji:'🎧',price:299},b:{name:'杂牌蓝牙耳机',bg:'#fef3c7',emoji:'🎧',price:39},diff:'easy'},
+  {a:{name:'罗马仕 20000mAh 充电宝',bg:'#e0e7ff',emoji:'🔋',price:158},b:{name:'杂牌 5000mAh 充电宝',bg:'#fff7ed',emoji:'🔋',price:45},diff:'easy'},
+  {a:{name:'小米智能台灯 Pro',bg:'#fef2f2',emoji:'💡',price:899},b:{name:'USB 夹子小台灯',bg:'#ecfdf5',emoji:'💡',price:129},diff:'easy'},
+  {a:{name:'天堂自动折叠伞',bg:'#f5f3ff',emoji:'🌂',price:76},b:{name:'一次性透明雨伞',bg:'#fffbeb',emoji:'🌂',price:22},diff:'easy'},
+  {a:{name:'戴森 V15 吸尘器',bg:'#fdf2f8',emoji:'🧹',price:4590},b:{name:'百元手持吸尘器',bg:'#f0fdf4',emoji:'🧹',price:89},diff:'easy'},
+  {a:{name:'农夫山泉 24瓶装',bg:'#e0f2fe',emoji:'💧',price:48},b:{name:'依云矿泉水 单瓶',bg:'#fefce8',emoji:'💧',price:12},diff:'easy'},
+  {a:{name:'iPad Pro 12.9\"',bg:'#f3e8ff',emoji:'📋',price:9299},b:{name:'杂牌平板 10\"',bg:'#fff7ed',emoji:'📋',price:399},diff:'easy'},
+  {a:{name:'海尔三门冰箱',bg:'#ecfdf5',emoji:'🧊',price:3299},b:{name:'迷你车载冰箱',bg:'#fef2f2',emoji:'🧊',price:199},diff:'easy'},
+  {a:{name:'SK-II 神仙水 230ml',bg:'#fce7f3',emoji:'✨',price:1590},b:{name:'普通爽肤水 200ml',bg:'#eff6ff',emoji:'✨',price:69},diff:'easy'},
+  {a:{name:'茅台 飞天 53°',bg:'#fff1f2',emoji:'🍶',price:2899},b:{name:'二锅头 56°',bg:'#ecfdf5',emoji:'🍶',price:25},diff:'easy'},
+  {a:{name:'LEGO 千年隼',bg:'#e5e7eb',emoji:'🧩',price:5499},b:{name:'杂牌积木飞船',bg:'#fef3c7',emoji:'🧩',price:89},diff:'easy'},
+  {a:{name:'Nike Air Jordan 1',bg:'#fef2f2',emoji:'👟',price:1299},b:{name:'帆布鞋',bg:'#f0fdf4',emoji:'👟',price:59},diff:'easy'},
+  {a:{name:'索尼 PS5',bg:'#e0e7ff',emoji:'🎮',price:3899},b:{name:'山寨掌机',bg:'#fefce8',emoji:'🎮',price:128},diff:'easy'},
+  {a:{name:'RTX 4090 显卡',bg:'#d1fae5',emoji:'💻',price:12999},b:{name:'GT 710 亮机卡',bg:'#fce7f3',emoji:'💻',price:199},diff:'easy'},
+
+  // medium (14道)
+  {a:{name:'富光不锈钢保温杯',bg:'#fce7f3',emoji:'☕',price:199},b:{name:'虎牌不锈钢保温杯',bg:'#d1fae5',emoji:'☕',price:268},diff:'medium'},
+  {a:{name:'Herschel 双肩包',bg:'#f0fdf4',emoji:'🎒',price:356},b:{name:'北极狐双肩包',bg:'#fdf2f8',emoji:'🎒',price:289},diff:'medium'},
+  {a:{name:'苏泊尔电热水壶',bg:'#fefce8',emoji:'🫖',price:455},b:{name:'美的电热水壶',bg:'#faf5ff',emoji:'🫖',price:512},diff:'medium'},
+  {a:{name:'小米手环 8',bg:'#e0f2fe',emoji:'⌚',price:239},b:{name:'华为手环 8',bg:'#fff7ed',emoji:'⌚',price:299},diff:'medium'},
+  {a:{name:'网易严选乳胶枕',bg:'#ecfdf5',emoji:'🛏️',price:199},b:{name:'宜家人体工学枕',bg:'#fef2f2',emoji:'🛏️',price:149},diff:'medium'},
+  {a:{name:'三只松鼠坚果礼盒',bg:'#fef3c7',emoji:'🥜',price:138},b:{name:'百草味坚果礼盒',bg:'#f3e8ff',emoji:'🥜',price:168},diff:'medium'},
+  {a:{name:'MUJI 香薰机',bg:'#e5e7eb',emoji:'🌸',price:350},b:{name:'名创优品香薰机',bg:'#fce7f3',emoji:'🌸',price:249},diff:'medium'},
+  {a:{name:'海飞丝洗发水 500ml',bg:'#dbeafe',emoji:'🧴',price:69},b:{name:'清扬洗发水 500ml',bg:'#fefce8',emoji:'🧴',price:55},diff:'medium'},
+  {a:{name:'康师傅红烧牛肉面 整箱',bg:'#fff1f2',emoji:'🍜',price:48},b:{name:'统一老坛酸菜面 整箱',bg:'#ecfdf5',emoji:'🍜',price:42},diff:'medium'},
+  {a:{name:'蕉下防晒衣',bg:'#fdf2f8',emoji:'👚',price:199},b:{name:'优衣库防晒衣',bg:'#f0fdf4',emoji:'👚',price:149},diff:'medium'},
+  {a:{name:'AirPods Pro 2',bg:'#eff6ff',emoji:'🎧',price:1799},b:{name:'三星 Galaxy Buds2',bg:'#fff7ed',emoji:'🎧',price:899},diff:'medium'},
+  {a:{name:'德芙巧克力礼盒',bg:'#fce7f3',emoji:'🍫',price:89},b:{name:'费列罗巧克力礼盒',bg:'#fef3c7',emoji:'🍫',price:128},diff:'medium'},
+  {a:{name:'Kindle Paperwhite',bg:'#e0e7ff',emoji:'📖',price:1068},b:{name:'小米多看电纸书',bg:'#fef2f2',emoji:'📖',price:599},diff:'medium'},
+  {a:{name:'Keep 瑜伽垫',bg:'#f0fdf4',emoji:'🧘',price:129},b:{name:'迪卡侬瑜伽垫',bg:'#e5e7eb',emoji:'🧘',price:79},diff:'medium'},
+
+  // hard (12道)
+  {a:{name:'联想无线鼠标',bg:'#e5e7eb',emoji:'🖱️',price:187},b:{name:'罗技无线鼠标',bg:'#f3e8ff',emoji:'🖱️',price:192},diff:'hard'},
+  {a:{name:'官方硅胶手机壳',bg:'#fff1f2',emoji:'📱',price:238},b:{name:'第三方硅胶手机壳',bg:'#f0f9ff',emoji:'📱',price:244},diff:'hard'},
+  {a:{name:'Anker USB-C 数据线',bg:'#eff6ff',emoji:'🔌',price:182},b:{name:'品胜 USB-C 数据线',bg:'#fef2f2',emoji:'🔌',price:179},diff:'hard'},
+  {a:{name:'可口可乐 330ml×24',bg:'#fef2f2',emoji:'🥤',price:59},b:{name:'百事可乐 330ml×24',bg:'#e0f2fe',emoji:'🥤',price:55},diff:'hard'},
+  {a:{name:'南孚电池 5号×20',bg:'#fefce8',emoji:'🔋',price:39},b:{name:'双鹿电池 5号×20',bg:'#f0fdf4',emoji:'🔋',price:36},diff:'hard'},
+  {a:{name:'得宝抽纸 24包',bg:'#fdf2f8',emoji:'🧻',price:69},b:{name:'维达抽纸 24包',bg:'#e0e7ff',emoji:'🧻',price:65},diff:'hard'},
+  {a:{name:'蒙牛纯牛奶 250ml×16',bg:'#dbeafe',emoji:'🥛',price:55},b:{name:'伊利纯牛奶 250ml×16',bg:'#fff1f2',emoji:'🥛',price:52},diff:'hard'},
+  {a:{name:'海底捞火锅底料',bg:'#fef2f2',emoji:'🍲',price:25},b:{name:'好人家火锅底料',bg:'#fef3c7',emoji:'🍲',price:22},diff:'hard'},
+  {a:{name:'公牛插线板 3m',bg:'#f0fdf4',emoji:'🔌',price:45},b:{name:'得力插线板 3m',bg:'#ecfdf5',emoji:'🔌',price:42},diff:'hard'},
+  {a:{name:'Type-C 转接头',bg:'#e5e7eb',emoji:'🔧',price:19},b:{name:'Type-C 转接头 2只装',bg:'#f3e8ff',emoji:'🔧',price:16},diff:'hard'},
+  {a:{name:'3M 口罩 N95×50',bg:'#eff6ff',emoji:'😷',price:89},b:{name:'霍尼韦尔口罩 N95×50',bg:'#fce7f3',emoji:'😷',price:85},diff:'hard'},
+  {a:{name:'晨光中性笔 12支',bg:'#fff7ed',emoji:'🖊️',price:18},b:{name:'得力中性笔 12支',bg:'#d1fae5',emoji:'🖊️',price:15},diff:'hard'},
+];
+
+const EMOTION_CURVE = ['easy','easy','medium','hard','easy','medium','medium','hard','easy','hard'];
+let gameQuestions = []; // 当前局的10道题
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function pickGame(){
+  const easy=shuffle(POOL.filter(q=>q.diff==='easy'));
+  const med=shuffle(POOL.filter(q=>q.diff==='medium'));
+  const hard=shuffle(POOL.filter(q=>q.diff==='hard'));
+  let ei=0,mi=0,hi=0;
+  gameQuestions=EMOTION_CURVE.map(d=>{
+    let pick;
+    if(d==='easy')pick=easy[ei++%easy.length];
+    else if(d==='medium')pick=med[mi++%med.length];
+    else pick=hard[hi++%hard.length];
+    // 随机交换A/B
+    if(Math.random()>.5){const t=pick.a;pick.a=pick.b;pick.b=t}
+    return pick;
+  });
+}
+
+const STATE={READY:'ready',PRESSED:'pressed',SUSPENSE:'suspense',REVEAL:'reveal',SETTLEMENT:'settlement'};
+let state=STATE.READY, qi=0, score=0, streak=0, maxStreak=0, correctCount=0;
+let selectedSide=null, brokeStreak=false, brokeAt=0, gameStarted=false;
+
+const $=s=>document.querySelector(s);
+const cardA=$('#cardA'),cardB=$('#cardB'),imgA=$('#imgA'),imgB=$('#imgB');
+const priceA=$('#priceA'),priceB=$('#priceB'),nameA=$('#nameA'),nameB=$('#nameB');
+const dotsEl=$('#dots'),streakBadge=$('#streakBadge'),streakNum=$('#streakNum');
+const fbText=$('#feedbackText'),fbSub=$('#feedbackSub');
+const settlement=$('#settlement'),settleIcon=$('#settleIcon'),settleScore=$('#settleScore');
+const settleCorrect=$('#settleCorrect'),settleStreak=$('#settleStreak'),settleRank=$('#settleRank'),perfectTag=$('#perfectTag');
+const btnRevenge=$('#btnRevenge'),btnReplay=$('#btnReplay'),btnShare=$('#btnShare');
+const onboard=$('#onboard'),btnStart=$('#btnStart');
+const promptTitle=$('#promptTitle'),promptSub=$('#promptSub');
+
+function init(){
+  pickGame();
+  dotsEl.innerHTML=gameQuestions.map(()=>'<div class="dot"></div>').join('');
+  updateDots();updateStreakBadge();renderQuestion();
+  cardA.addEventListener('pointerdown',()=>onSelect('a'));
+  cardB.addEventListener('pointerdown',()=>onSelect('b'));
+  btnReplay.addEventListener('click',resetGame);
+  btnRevenge.addEventListener('click',revengeGame);
+  btnShare.addEventListener('click',shareResult);
+  btnStart.addEventListener('click',startGame);
+  state=STATE.READY;
+}
+
+function startGame(){
+  onboard.classList.remove('show');
+  gameStarted=true;
+  state=STATE.READY;
+}
+
+function updateDots(){
+  [...dotsEl.children].forEach((d,i)=>{
+    d.className='dot';
+    if(i<qi)d.classList.add('done');
+    if(i===qi)d.classList.add('current');
+  });
+}
+
+function updateStreakBadge(){
+  if(streak<3){streakBadge.classList.remove('show','big','mega');return}
+  streakBadge.classList.add('show');streakBadge.classList.remove('big','mega');
+  if(streak>=7)streakBadge.classList.add('mega');
+  else if(streak>=5)streakBadge.classList.add('big');
+  streakNum.textContent='×'+streak;
+}
+
+function renderQuestion(){
+  const q=gameQuestions[qi];
+  [[imgA,nameA,q.a],[imgB,nameB,q.b]].forEach(([img,name,d])=>{
+    img.style.background=`linear-gradient(135deg,${d.bg},${d.bg}dd)`;
+    img.innerHTML=`<span>${d.emoji}</span>`;
+    name.textContent=d.name;
+  });
+  priceA.textContent='';priceB.textContent='';
+  priceA.classList.remove('correct-price');priceB.classList.remove('correct-price');
+  cardA.classList.remove('suspense','dim','correct');cardB.classList.remove('suspense','dim','correct');
+  fbText.textContent='';fbText.className='feedback-text';fbSub.textContent='';
+  selectedSide=null;state=STATE.READY;
+}
+
+let transId=0; // transaction ID — prevents stale handlers from firing
+
+function onSelect(side){
+  if(!gameStarted||state!==STATE.READY)return;
+  state=STATE.PRESSED;selectedSide=side;
+  (side==='a'?cardB:cardA).classList.add('dim');
+  promptSub.textContent='';
+  const myTrans=++transId;
+  setTimeout(()=>{
+    if(myTrans!==transId)return; // stale
+    state=STATE.SUSPENSE;
+    cardA.classList.add('suspense');cardB.classList.add('suspense');
+    priceA.textContent='';priceB.textContent='';
+    let t=setTimeout(()=>{if(myTrans===transId)doReveal()},400);
+    const skip=e=>{
+      e.stopImmediatePropagation();
+      if(myTrans!==transId)return;
+      clearTimeout(t);
+      cardA.removeEventListener('pointerdown',skip);cardB.removeEventListener('pointerdown',skip);
+      doReveal();
+    };
+    cardA.addEventListener('pointerdown',skip,{once:true});cardB.addEventListener('pointerdown',skip,{once:true});
+  },150);
+}
+
+function doReveal(){
+  if(state===STATE.REVEAL)return; // already revealed
+  state=STATE.REVEAL;
+  const myTrans=++transId;
+  const q=gameQuestions[qi], a=q.a, b=q.b;
+  const chosen=selectedSide==='a'?a:b, other=selectedSide==='a'?b:a;
+  const chosenCard=selectedSide==='a'?cardA:cardB;
+  cardA.classList.remove('suspense');cardB.classList.remove('suspense');
+  animatePrice(priceA,a.price);animatePrice(priceB,b.price);
+  const isCorrect=chosen.price>other.price;
+  const diff=Math.abs(a.price-b.price), diffPct=diff/Math.max(a.price,b.price);
+
+  if(isCorrect){
+    correctCount++;streak++;
+    if(streak>maxStreak)maxStreak=streak;
+    const bonus=streak>=7?30:streak>=5?20:streak>=3?15:streak>=2?12:10;
+    score+=bonus;
+    chosenCard.classList.add('correct');
+    (selectedSide==='a'?priceA:priceB).classList.add('correct-price');
+    spawnScorePop('+'+bonus);
+    fbText.textContent='✅ 答对了！';fbText.className='feedback-text correct';fbSub.textContent='';
+    promptTitle.textContent='哪个更贵？';
+  }else{
+    const lostStreak=streak;
+    streak=0;
+    if(lostStreak>=3){brokeStreak=true;brokeAt=lostStreak}
+    const correctCard=a.price>b.price?cardA:cardB;
+    correctCard.classList.add('correct');
+    (a.price>b.price?priceA:priceB).classList.add('correct-price');
+    if(diffPct<0.03){fbText.textContent=`神仙难辨！只差 ¥${diff}`;fbText.className='feedback-text nearmiss'}
+    else if(diffPct<0.08){fbText.textContent=`差 ¥${diff}，有点可惜`;fbText.className='feedback-text nearmiss'}
+    else if(diffPct<0.2){fbText.textContent=`差 ¥${diff}，可能需要再看看`;fbText.className='feedback-text'}
+    else{fbText.textContent=`差 ¥${diff}！看来需要多逛逛`;fbText.className='feedback-text'}
+    fbSub.textContent='绿色框 = 正确答案';
+    promptTitle.textContent='😤 可惜！';
+  }
+  updateDots();updateStreakBadge();
+  let t=setTimeout(()=>{if(myTrans===transId)goNext()},1400);
+  let skipOk=false; setTimeout(()=>{if(myTrans===transId)skipOk=true},250);
+  const skip=e=>{
+    e.stopImmediatePropagation();
+    if(myTrans!==transId||!skipOk)return;
+    clearTimeout(t);
+    cardA.removeEventListener('pointerdown',skip);cardB.removeEventListener('pointerdown',skip);
+    goNext();
+  };
+  cardA.addEventListener('pointerdown',skip,{once:true});cardB.addEventListener('pointerdown',skip,{once:true});
+}
+
+function goNext(){
+  ++transId; // invalidate all pending handlers
+  qi++;
+  if(qi>=gameQuestions.length){showSettlement()}
+  else{updateDots();renderQuestion();promptTitle.textContent='哪个更贵？'}
+}
+
+function animatePrice(el,target){
+  const dur=250,start=performance.now();
+  function tick(now){const p=Math.min((now-start)/dur,1),e=1-Math.pow(1-p,3);el.textContent='¥'+Math.round(e*target).toLocaleString();if(p<1)requestAnimationFrame(tick)}
+  requestAnimationFrame(tick);
+}
+
+function spawnScorePop(text){
+  const el=document.createElement('div');el.className='score-pop';el.textContent=text;
+  document.body.appendChild(el);el.addEventListener('animationend',()=>el.remove());
+}
+
+function showSettlement(){
+  state=STATE.SETTLEMENT;settleScore.textContent=score;settleCorrect.textContent=correctCount;settleStreak.textContent=maxStreak;
+  const isPerfect=correctCount===10;
+  const pct=Math.min(95,Math.round(50+correctCount*4+Math.random()*10));
+  if(isPerfect){settleIcon.textContent='👑';perfectTag.innerHTML='<div class="perfect-tag">🏆 完美通关！</div>';settleRank.textContent='满分！你是价格之王';spawnConfetti()}
+  else if(correctCount>=8){settleIcon.textContent='🎉';perfectTag.innerHTML='';settleRank.textContent=`超过了 ${pct}% 的玩家`}
+  else if(correctCount>=5){settleIcon.textContent='👍';perfectTag.innerHTML='';settleRank.textContent=`超过了 ${pct}% 的玩家`}
+  else{settleIcon.textContent='💪';perfectTag.innerHTML='';settleRank.textContent=`超过了 ${pct}% 的玩家`}
+  if(brokeStreak&&maxStreak>=5){btnRevenge.style.display='block';btnRevenge.textContent=`🔥 复仇模式（连胜从 ×3 开始）`}
+  else{btnRevenge.style.display='none'}
+  settlement.classList.add('show');
+  promptTitle.textContent='';promptSub.textContent='';
+}
+
+function resetGame(){
+  pickGame(); // new questions each game
+  qi=0;score=0;streak=0;maxStreak=0;correctCount=0;selectedSide=null;brokeStreak=false;brokeAt=0;
+  settlement.classList.remove('show');perfectTag.innerHTML='';
+  dotsEl.innerHTML=gameQuestions.map(()=>'<div class="dot"></div>').join('');
+  updateDots();updateStreakBadge();renderQuestion();
+  promptTitle.textContent='哪个更贵？';promptSub.textContent='点击你认为价格更高的商品';
+  fbText.textContent='';fbText.className='feedback-text';fbSub.textContent='';
+  state=STATE.READY;
+}
+
+function revengeGame(){
+  pickGame(); // new questions
+  qi=0;score=0;correctCount=0;streak=3;maxStreak=3;selectedSide=null;brokeStreak=false;
+  settlement.classList.remove('show');perfectTag.innerHTML='';
+  dotsEl.innerHTML=gameQuestions.map(()=>'<div class="dot"></div>').join('');
+  updateDots();updateStreakBadge();renderQuestion();
+  promptTitle.textContent='哪个更贵？';promptSub.textContent='复仇模式：连胜从 ×3 开始！';
+  fbText.textContent='';fbText.className='feedback-text';fbSub.textContent='';
+  state=STATE.READY;
+}
+
+function shareResult(){
+  const text=`🎯 猜差价\n🏆 ${score}分 · ${correctCount}/10对 · 连胜×${maxStreak}\n超过了 ${settleRank.textContent.replace('超过了 ','').replace(' 的玩家','')} 的玩家\n\n来测测你的价格嗅觉？ct256.cn/guess-price-skeleton`;
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(()=>{btnShare.textContent='✅ 已复制！发到群里';setTimeout(()=>btnShare.textContent='📤 炫耀战绩',2000)})}
+}
+
+function spawnConfetti(){
+  const colors=['#fbbf24','#f59e0b','#10b981','#0ea5e9','#6366f1','#ec4899','#f97316','#84cc16'];
+  for(let i=0;i<80;i++){const p=document.createElement('div');p.className='confetti-piece';p.style.left=Math.random()*100+'%';p.style.top=-(Math.random()*20)+'px';p.style.width=(6+Math.random()*10)+'px';p.style.height=(6+Math.random()*10)+'px';p.style.background=colors[Math.floor(Math.random()*colors.length)];p.style.borderRadius=Math.random()>.5?'50%':'2px';p.style.animationDuration=(2+Math.random()*3)+'s';p.style.animationDelay=Math.random()*.5+'s';document.body.appendChild(p);p.addEventListener('animationend',()=>p.remove())}
+}
+
+init();
+</script>
+</body>
+</html>

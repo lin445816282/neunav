@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>全局点击捕获</title>
+    <style>
+        * {margin:0;padding:0}
+        body {overflow:hidden;}
+        #gameBox {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        #clickMask {
+            position: absolute;
+            left:0;top:0;
+            width:100%;height:100%;
+            background: transparent;
+            z-index: 9999;
+            pointer-events: auto;
+        }
+        .ball {
+            width:100px;height:100px;border-radius:50%;
+            position:absolute;
+        }
+    </style>
+</head>
+<body>
+<div id="gameBox">
+    <div class="ball" style="background:red;left:100px;top:200px"></div>
+    <div class="ball" style="background:blue;left:220px;top:260px"></div>
+    <div id="clickMask"></div>
+</div>
+
+<script>
+const mask = document.getElementById('clickMask');
+const balls = document.querySelectorAll('.ball');
+
+let ballList = [];
+balls.forEach(item => {
+    const rect = item.getBoundingClientRect();
+    ballList.push({
+        dom: item,
+        x: rect.left,
+        y: rect.top,
+        w: rect.width,
+        h: rect.height,
+        r: rect.width / 2
+    })
+})
+
+mask.addEventListener('mousedown', function(e){
+    handleClick(e.clientX, e.clientY);
+})
+mask.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    Array.from(e.touches).forEach(touch=>{
+        handleClick(touch.clientX, touch.clientY);
+    })
+}, {passive:false})
+
+function handleClick(px, py){
+    console.log('点击坐标', px, py);
+    for(let i = ballList.length -1; i >=0; i--){
+        const b = ballList[i];
+        const dx = px - (b.x + b.r);
+        const dy = py - (b.y + b.r);
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < b.r){
+            onBallClick(b.dom);
+            break;
+        }
+    }
+}
+
+function onBallClick(ballDom){
+    console.log('命中球体', ballDom);
+    ballDom.style.transform = 'scale(0.8)';
+    setTimeout(() => ballDom.style.transform = '', 150);
+}
+</script>
+</body>
+</html>

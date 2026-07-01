@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>萌岛物语</title>
+<style>
+:root {
+  --accent: #FF8C69; --accent2: #7EC8E3; --text: #4A3728; --sub: #8B7355;
+  --gold: #FFB347; --dia: #64B5F6; --ok: #81C784; --err: #EF9A9A;
+  --cell: 64px; --gap: 4px;
+  --sky-top: #B5E8F7; --sky-mid: #E8D5F5; --sky-bot: #FFF5E6;
+  --ocean1: #A8D8EA; --ocean2: #C9E4F0; --ocean3: #E0F0F5;
+  --sand: #FFF8ED;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ── Animated Sky Gradient ── */
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background: linear-gradient(180deg,
+    var(--sky-top) 0%,
+    #D4EAF7 15%,
+    var(--sky-mid) 35%,
+    #F0E6F3 50%,
+    var(--sky-bot) 70%,
+    var(--sand) 100%
+  );
+  background-attachment: fixed;
+  color:var(--text);display:flex;justify-content:center;
+  min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+  overscroll-behavior:contain;user-select:none;-webkit-user-select:none;
+  position:relative;
+}
+
+/* ── Floating Clouds ── */
+body::before, body::after {
+  content:''; position:fixed; pointer-events:none; z-index:0;
+  border-radius:50%; background:rgba(255,255,255,.35);
+  animation:floatCloud linear infinite;
+}
+body::before{
+  width:120px;height:50px;
+  top:8%;left:-120px;
+  animation-duration:25s;
+  box-shadow:
+    30px -15px 0 10px rgba(255,255,255,.25),
+    60px 5px 0 5px rgba(255,255,255,.2);
+}
+body::after{
+  width:140px;height:45px;
+  top:18%;left:-140px;
+  animation-duration:35s;animation-delay:8s;
+  box-shadow:
+    -20px -10px 0 8px rgba(255,255,255,.2),
+    40px 8px 0 12px rgba(255,255,255,.25),
+    80px -5px 0 6px rgba(255,255,255,.18);
+}
+@keyframes floatCloud{
+  from{transform:translateX(0)}
+  to{transform:translateX(calc(100vw + 280px))}
+}
+
+/* ── Decorative Island Silhouettes ── */
+.island-decor{
+  position:fixed;bottom:0;left:0;right:0;pointer-events:none;z-index:0;
+  height:30vh;overflow:hidden;
+}
+.island-decor::before{
+  content:'';position:absolute;bottom:-20px;left:5%;
+  width:100px;height:60px;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(255,140,105,.12) 0%,transparent 70%);
+}
+.island-decor::after{
+  content:'';position:absolute;bottom:-30px;right:10%;
+  width:140px;height:70px;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(126,200,227,.10) 0%,transparent 70%);
+}
+.game{width:100%;max-width:400px;position:relative;min-height:100dvh;display:flex;flex-direction:column;z-index:1}
+
+/* ── TopBar ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;gap:8px;
+  background:rgba(255,255,255,.55);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  margin:12px 12px 0;border-radius:16px;
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:0 2px 16px rgba(126,200,227,.12);
+}
+.topbar .res{display:flex;gap:12px}
+.topbar .res-item{display:flex;align-items:center;gap:4px;font-size:14px;font-weight:600}
+.topbar .res-item .icon{font-size:18px}
+.topbar .energy{font-size:14px;color:var(--sub)}
+.topbar .energy .val{font-weight:600;color:var(--text)}
+
+/* ── Board ── */
+.board-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;gap:8px}
+.hint{
+  font-size:12px;color:var(--sub);text-align:center;padding:6px 14px;
+  background:rgba(255,255,255,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-radius:12px;border:1px solid rgba(255,255,255,.5);
+  transition:opacity .5s
+}
+.hint.hidden{opacity:0}
+.board{
+  display:grid;grid-template-columns:repeat(5,var(--cell));grid-template-rows:repeat(6,var(--cell));
+  gap:var(--gap);padding:12px;
+  background:rgba(255,255,255,.45);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-radius:20px;border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 4px 24px rgba(126,200,227,.1);
+  position:relative;touch-action:none
+}
+.cell{
+  width:var(--cell);height:var(--cell);border-radius:14px;
+  background:rgba(255,255,255,.35);border:2px dashed rgba(255,140,105,.15);
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+  transition:transform .15s ease,box-shadow .15s ease;
+  position:relative;cursor:grab
+}
+.cell:active{cursor:grabbing}
+.cell.has-item{
+  background:rgba(255,255,255,.7);border:2px solid rgba(255,140,105,.25);
+  box-shadow:0 2px 8px rgba(0,0,0,.04)
+}
+.cell .lvl{position:absolute;bottom:2px;right:4px;font-size:9px;color:var(--accent);font-weight:700}
+.cell.drag-over{transform:scale(1.08);box-shadow:0 0 0 3px var(--accent);border-color:var(--accent)}
+.cell.drag-source{opacity:.4;transform:scale(.9)}
+.cell.selected{box-shadow:0 0 0 3px var(--dia);border-color:var(--dia);transform:scale(1.05);border-style:solid}
+.cell.bounce{animation:bounce .3s ease}
+@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+/* ── Toast ── */
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;
+  background:rgba(74,55,40,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:#fff;padding:8px 20px;border-radius:20px;
+  font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:300;backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center}
+.modal{
+  background:rgba(255,255,255,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-radius:20px;padding:24px;max-width:320px;width:90%;
+  text-align:center;animation:popIn .25s ease-out;
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:0 8px 32px rgba(126,200,227,.15);
+}
+@keyframes popIn{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+.modal h2{font-size:20px;margin-bottom:8px;color:var(--accent)}
+.modal p{font-size:14px;color:var(--sub);margin-bottom:16px;line-height:1.6}
+.modal .rewards{display:flex;justify-content:center;gap:16px;margin-bottom:16px}
+.modal .reward{font-size:13px;color:var(--text)}
+.modal .reward .val{font-size:18px;font-weight:700;color:var(--gold)}
+.modal .btn{
+  background:linear-gradient(135deg,var(--accent),#FF7B5A);color:#fff;border:none;border-radius:20px;
+  padding:10px 40px;font-size:16px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 14px rgba(255,140,105,.4)
+}
+.modal .btn:active{transform:scale(.95)}
+
+/* ── Bottom Nav ── */
+.bnav{
+  display:flex;
+  background:rgba(255,255,255,.6);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid rgba(255,255,255,.6);
+  padding:8px 0 20px;gap:0;border-radius:20px 20px 0 0;
+  margin:0 12px;
+}
+
+/* ── Ghost ── */
+.ghost{position:fixed;pointer-events:none;z-index:150;width:var(--cell);height:var(--cell);
+  border-radius:14px;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;
+  font-size:26px;border:2px solid var(--accent);box-shadow:0 4px 16px rgba(0,0,0,.15);
+  transform:translate(-50%,-50%) scale(1.1)}
+
+.bnav .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  font-size:10px;color:var(--sub);cursor:pointer;padding:4px 0}
+.bnav .b.active{color:var(--accent)}
+.bnav .b .bi{font-size:20px}
+
+/* ── Particle ── */
+.particle{position:fixed;pointer-events:none;font-size:20px;z-index:100;animation:particleUp .4s ease-out forwards}
+@keyframes particleUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-40px) scale(1.5)}}
+</style>
+</head>
+<body>
+<div class="island-decor"></div>
+<div class="game" id="app">
+  <!-- TopBar -->
+  <div class="topbar">
+    <div class="res">
+      <div class="res-item"><span class="icon">🪙</span><span id="gold">0</span></div>
+      <div class="res-item"><span class="icon">💎</span><span id="diamond">0</span></div>
+    </div>
+    <div class="energy">⚡ <span class="val"><span id="energy">100</span>/100</span></div>
+  </div>
+
+  <!-- Board -->
+  <div class="board-wrap">
+    <div class="hint" id="hint">👆 点一下选中，再点同类型合成</div>
+    <div class="board" id="board"></div></div>
+
+  <!-- Bottom Nav -->
+  <div class="bnav">
+    <div class="b active" data-tab="island"><span class="bi">🏝️</span>岛屿</div>
+    <div class="b" data-tab="backpack"><span class="bi">🎒</span>背包</div>
+    <div class="b" data-tab="friends"><span class="bi">👥</span>好友</div>
+    <div class="b" data-tab="shop"><span class="bi">🏪</span>商店</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// Data
+// ═══════════════════════════════════════════
+const COLS=5, ROWS=6;
+
+const ITEM_CONFIG = {
+  wood:  {name:'木材', lvls:['🌱','🪵','🌳','🪓','🏗️','🏠','🏰','🏯','🗼','🌲✨']},
+  stone: {name:'石头', lvls:['🪨','⚪','🔮','💠','🏛️','🗿','⛩️','🕌','🏛️✨','💎']},
+  flower:{name:'花朵', lvls:['🌱','🌿','🌷','🌸','🌺','🌻','💐','🏵️','🌼✨','🌈']},
+  shell: {name:'贝壳', lvls:['🐚','🦪','🐙','🦑','🦞','🐠','🐡','🐬','🐳','🐉']},
+};
+
+let state = loadState();
+
+function defaultState(){
+  return {
+    gold:50, diamond:5, energy:100, energy_ts:Date.now(),
+    board:Array(ROWS*COLS).fill(null),
+    offline_collected:false
+  };
+}
+
+function loadState(){
+  try{
+    const raw=localStorage.getItem('moe_island');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return defaultState();
+}
+
+function saveState(){
+  state.energy_ts=Date.now();
+  localStorage.setItem('moe_island',JSON.stringify(state));
+}
+
+// ═══════════════════════════════════════════
+// Board Operations
+// ═══════════════════════════════════════════
+function cellIndex(row,col){return row*COLS+col}
+
+function getCell(row,col){
+  if(row<0||row>=ROWS||col<0||col>=COLS)return null;
+  return state.board[cellIndex(row,col)];
+}
+
+function setCell(row,col,item){
+  state.board[cellIndex(row,col)]=item;
+}
+
+function findEmpty(){
+  const empties=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(!getCell(r,c))empties.push({r,c});
+  return empties;
+}
+
+function spawnItem(){
+  const empties=findEmpty();
+  if(empties.length===0){toast('棋盘已满，请合成清理');return;}
+
+  const keys=Object.keys(ITEM_CONFIG);
+  const type=keys[Math.floor(Math.random()*keys.length)];
+  const pos=empties[Math.floor(Math.random()*empties.length)];
+  const item={type,level:1};
+  setCell(pos.r,pos.c,item);
+  renderBoard();
+  saveState();
+}
+
+function mergeItems(itemA,itemB){
+  if(itemA.type!==itemB.type)return null;
+  if(itemA.level!==itemB.level)return null;
+  if(itemA.level>=10)return null;
+  return {type:itemA.type,level:itemA.level+1};
+}
+
+// ═══════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════
+function renderStats(){
+  document.getElementById('gold').textContent=state.gold.toLocaleString();
+  document.getElementById('diamond').textContent=state.diamond;
+  document.getElementById('energy').textContent=state.energy;
+}
+
+function renderBoard(){
+  selectedCell=null; // Clear selection on re-render
+  const board=document.getElementById('board');
+  let html='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const item=getCell(r,c);
+      const icon=item?ITEM_CONFIG[item.type].lvls[item.level-1]:'';
+      const cls=item?'cell has-item':'cell';
+      html+=`<div class="${cls}" data-r="${r}" data-c="${c}">
+        ${icon}
+        ${item?`<span class="lvl">Lv${item.level}</span>`:''}
+      </div>`;
+    }
+  }
+  board.innerHTML=html;
+
+  // Attach drag events
+  setupDrag();
+}
+
+// ═══════════════════════════════════════════
+// Drag & Drop + Tap-to-AutoMerge
+// ═══════════════════════════════════════════
+let dragItem=null, dragFrom=null, ghost=null;
+let dragMoved=false;
+let dragStartX=0, dragStartY=0;
+
+function setupDrag(){
+  document.querySelectorAll('.cell.has-item').forEach(el=>{
+    el.addEventListener('touchstart',onDragStart,{passive:false});
+    el.addEventListener('mousedown',onDragStart);
+    el.addEventListener('click',onCellClick);
+  });
+}
+
+// ── Tap: select then merge ───────────────────────
+let selectedCell = null;
+
+function onCellClick(e){
+  if(dragMoved){dragMoved=false;return;}
+  const cell=e.currentTarget;
+  const r=parseInt(cell.dataset.r), c=parseInt(cell.dataset.c);
+  const item=getCell(r,c);
+  if(!item)return;
+
+  // Clicking the already-selected cell → deselect
+  if(selectedCell && selectedCell.r===r && selectedCell.c===c){
+    cell.classList.remove('selected');
+    selectedCell=null;
+    return;
+  }
+
+  // No selection yet → select this cell
+  if(!selectedCell){
+    cell.classList.add('selected');
+    selectedCell={r,c,el:cell};
+    return;
+  }
+
+  // Has selection, clicked a different cell
+  const selItem=getCell(selectedCell.r,selectedCell.c);
+  const merged=mergeItems(selItem,item);
+  if(merged){
+    // ✅ Match — merge!
+    const hint=document.getElementById('hint');
+    if(hint)hint.classList.add('hidden');
+    selectedCell.el.classList.remove('selected');
+    setCell(selectedCell.r,selectedCell.c,null);
+    setCell(r,c,merged);
+    const rect=cell.getBoundingClientRect();
+    spawnParticles(rect.left+rect.width/2,rect.top+rect.height/2);
+    cell.classList.add('bounce');
+    state.gold+=merged.level*5;
+    state.energy=Math.max(0,state.energy-2);
+    toast(`${ITEM_CONFIG[merged.type].name} Lv${merged.level} 合成! +${merged.level*5}🪙`);
+    selectedCell=null;
+    saveState();
+    renderBoard();
+    renderStats();
+  }else{
+    // ❌ No match — silently switch selection, no toast
+    selectedCell.el.classList.remove('selected');
+    cell.classList.add('selected');
+    selectedCell={r,c,el:cell};
+  }
+}
+
+// ── Drag: move/merge ───────────────────────
+function onDragStart(e){
+  if(dragItem)return;
+  const cell=e.currentTarget;
+  const r=parseInt(cell.dataset.r), c=parseInt(cell.dataset.c);
+  const item=getCell(r,c);
+  if(!item)return;
+  e.preventDefault();
+
+  dragItem=item;
+  dragFrom={r,c};
+  dragMoved=false;
+  const sx=e.touches?e.touches[0].clientX:e.clientX;
+  const sy=e.touches?e.touches[0].clientY:e.clientY;
+  dragStartX=sx; dragStartY=sy;
+  cell.classList.add('drag-source');
+
+  ghost=document.createElement('div');
+  ghost.className='ghost';
+  ghost.textContent=ITEM_CONFIG[item.type].lvls[item.level-1];
+  document.body.appendChild(ghost);
+  moveGhost(e);
+
+  document.addEventListener('touchmove',onDragMove,{passive:false});
+  document.addEventListener('touchend',onDragEnd);
+  document.addEventListener('mousemove',onDragMove);
+  document.addEventListener('mouseup',onDragEnd);
+}
+
+function onDragMove(e){
+  if(!dragItem)return;
+  e.preventDefault();
+  const mx=e.touches?e.touches[0].clientX:e.clientX;
+  const my=e.touches?e.touches[0].clientY:e.clientY;
+  const dx=mx-dragStartX, dy=my-dragStartY;
+  if(!dragMoved && Math.abs(dx)<8 && Math.abs(dy)<8)return; // 8px threshold
+  dragMoved=true;
+  moveGhost(e);
+
+  const target=document.elementFromPoint(
+    e.touches?e.touches[0].clientX:e.clientX,
+    e.touches?e.touches[0].clientY:e.clientY
+  );
+  document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+  if(target&&target.classList.contains('cell')&&target!==document.querySelector('.drag-source')){
+    target.classList.add('drag-over');
+  }
+}
+
+function moveGhost(e){
+  const x=e.touches?e.touches[0].clientX:e.clientX;
+  const y=e.touches?e.touches[0].clientY:e.clientY;
+  if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px';}
+}
+
+function onDragEnd(e){
+  document.removeEventListener('touchmove',onDragMove);
+  document.removeEventListener('touchend',onDragEnd);
+  document.removeEventListener('mousemove',onDragMove);
+  document.removeEventListener('mouseup',onDragEnd);
+
+  if(ghost){ghost.remove();ghost=null;}
+  document.querySelectorAll('.drag-source').forEach(el=>el.classList.remove('drag-source'));
+  document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+
+  if(!dragItem||!dragMoved){dragItem=null;dragFrom=null;return;}
+
+  const x=e.changedTouches?e.changedTouches[0].clientX:e.clientX;
+  const y=e.changedTouches?e.changedTouches[0].clientY:e.clientY;
+  const target=document.elementFromPoint(x,y);
+
+  if(target&&target.classList.contains('cell')){
+    const tr=parseInt(target.dataset.r), tc=parseInt(target.dataset.c);
+    const targetItem=getCell(tr,tc);
+
+    if(targetItem){
+      const merged=mergeItems(dragItem,targetItem);
+      if(merged){
+        setCell(dragFrom.r,dragFrom.c,null);
+        setCell(tr,tc,merged);
+        const rect=target.getBoundingClientRect();
+        spawnParticles(rect.left+rect.width/2,rect.top+rect.height/2);
+        state.gold+=merged.level*5;
+        state.energy=Math.max(0,state.energy-2);
+        toast(`${ITEM_CONFIG[merged.type].name} Lv${merged.level} 合成!`);
+        saveState();
+        renderBoard();
+        renderStats();
+      }else{
+        target.classList.add('bounce');
+        setTimeout(()=>target.classList.remove('bounce'),300);
+      }
+    }else{
+      setCell(dragFrom.r,dragFrom.c,null);
+      setCell(tr,tc,dragItem);
+      state.energy=Math.max(0,state.energy-1);
+      saveState();
+      renderBoard();
+    }
+  }
+
+  dragItem=null;
+  dragFrom=null;
+  dragMoved=false;
+}
+
+// ═══════════════════════════════════════════
+// Particles
+// ═══════════════════════════════════════════
+function spawnParticles(x,y){
+  const emojis=['✨','🌟','💫','⭐','🎉'];
+  for(let i=0;i<5;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    p.textContent=emojis[i];
+    p.style.left=(x+(Math.random()-0.5)*40)+'px';
+    p.style.top=(y+(Math.random()-0.5)*20)+'px';
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(),400);
+  }
+}
+
+// ═══════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════
+let toastTimer;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2000);
+}
+
+// ═══════════════════════════════════════════
+// Offline Rewards
+// ═══════════════════════════════════════════
+function showOfflineRewards(){
+  if(state.offline_collected)return;
+  const now=Date.now();
+  const elapsed=Math.floor((now-state.energy_ts)/1000);
+  if(elapsed<60)return;
+
+  const offlineSec=Math.min(elapsed,28800); // max 8h
+  const baseRate=1; // gold per minute
+  const earned=Math.floor(baseRate*offlineSec/60);
+  if(earned<=5)return;
+
+  state.gold+=earned;
+  state.offline_collected=true;
+  saveState();
+
+  const hours=Math.floor(offlineSec/3600);
+  const mins=Math.floor((offlineSec%3600)/60);
+  const timeStr=hours>0?`${hours}小时${mins}分钟`:`${mins}分钟`;
+
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.innerHTML=`<div class="modal">
+    <h2>🏝️ 欢迎回来!</h2>
+    <p>你离开了 ${timeStr}</p>
+    <div class="rewards"><div class="reward">获得<div class="val">+${earned.toLocaleString()}🪙</div></div></div>
+    <button class="btn">收下金币</button>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('.btn').onclick=()=>{
+    overlay.remove();
+    renderStats();
+  };
+}
+
+// ═══════════════════════════════════════════
+// Bottom Nav
+// ═══════════════════════════════════════════
+document.querySelectorAll('.bnav .b').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.bnav .b').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab=btn.dataset.tab;
+    if(tab==='backpack')toast('🎒 背包开发中');
+    else if(tab==='friends')toast('👥 好友系统开发中');
+    else if(tab==='shop')toast('🏪 商店开发中');
+  });
+});
+
+// ═══════════════════════════════════════════
+// Auto-spawn
+// ═══════════════════════════════════════════
+let spawnInterval;
+function startAutoSpawn(){
+  spawnInterval=setInterval(()=>{
+    const empties=findEmpty();
+    if(empties.length===0){spawnItem();return;}
+    if(Math.random()<0.4)spawnItem();
+  },15000);
+}
+
+// ═══════════════════════════════════════════
+// Energy Recovery
+// ═══════════════════════════════════════════
+setInterval(()=>{
+  if(state.energy<100){
+    state.energy=Math.min(100,state.energy+1);
+    renderStats();
+  }
+},30000); // 1 energy per 30s
+
+// ═══════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════
+// Spawn initial items if board is empty
+if(findEmpty().length===ROWS*COLS){
+  for(let i=0;i<6;i++)spawnItem();
+}
+
+renderStats();
+renderBoard();
+startAutoSpawn();
+
+// Show offline rewards after short delay
+setTimeout(showOfflineRewards,500);
+</script>
+</body>
+</html>

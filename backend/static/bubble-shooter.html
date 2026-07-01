@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>🫧 泡泡龙 - 小游戏</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#1a0033;min-height:100vh;display:flex;flex-direction:column;align-items:center;color:#333;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.header{width:100%;max-width:420px;padding:16px;text-align:center}
+.header .icon{font-size:48px;display:block;margin-bottom:4px}
+.header h1{font-size:22px;color:#e040fb;margin:0}
+.header .sub{font-size:13px;color:#888;margin-top:4px}
+.score-bar{display:flex;justify-content:space-around;width:100%;max-width:420px;padding:8px 16px}
+.score-item{text-align:center}
+.score-item .label{font-size:11px;color:#888}
+.score-item .value{font-size:20px;font-weight:700;color:#e040fb}
+.game-area{flex:1;width:100%;max-width:420px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.coming-soon{text-align:center;padding:40px 20px;color:#aaa}
+.coming-soon .cs-icon{font-size:64px;margin-bottom:16px}
+.coming-soon h2{font-size:20px;color:#666;margin-bottom:8px}
+.coming-soon p{font-size:14px;line-height:1.6}
+.bottom-bar{width:100%;max-width:420px;padding:12px 16px;display:flex;gap:10px;justify-content:center}
+.btn{flex:1;max-width:160px;padding:12px;border:none;border-radius:24px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn:active{transform:scale(.95)}
+.btn-primary{background:#e040fb;color:#fff}
+.btn-outline{background:transparent;color:#e040fb;border:2px solid #e040fb}
+.btn-ghost{background:rgba(0,0,0,.05);color:#666}
+.footer{font-size:10px;color:#aaa;padding:8px;text-align:center}
+
+#gameCanvas{display:block;width:100%;max-width:360px;margin:0 auto;border-radius:8px;background:linear-gradient(180deg,#1a0033,#2d0066)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="icon">🫧</span>
+  <h1>泡泡龙</h1>
+  <div class="sub">瞄准射击消除同色泡泡</div>
+</div>
+
+<div class="score-bar">
+  <div class="score-item">
+    <div class="label">🏆 最高分</div>
+    <div class="value" id="bestScore">0</div>
+  </div>
+  <div class="score-item">
+    <div class="label">📊 当前分</div>
+    <div class="value" id="currentScore">0</div>
+  </div>
+</div>
+
+<div class="game-area" id="gameArea">
+<canvas id="gameCanvas"></canvas>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-outline" id="btnRestart">🔄 重新开始</button>
+  <button class="btn btn-primary" id="btnBack">🏠 游戏大厅</button>
+</div>
+
+<div class="footer">仅供娱乐 · 适度游戏益脑</div>
+
+<script>
+
+// Navigation
+document.getElementById('btnBack').addEventListener('click',()=>{location.href='/nav'});
+document.getElementById('btnRestart').addEventListener('click',()=>{location.reload()});
+
+// Canvas init for canvas-based games
+const canvas = document.getElementById('gameCanvas');
+
+
+if(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Draw placeholder
+  ctx.fillStyle = '#333';
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#666';
+  ctx.textAlign = 'center';
+  ctx.fillText('🎮 即将上线', rect.width/2, rect.height/2);
+  ctx.fillText('敬请期待', rect.width/2, rect.height/2 + 28);
+}
+</script>
+</body>
+</html>

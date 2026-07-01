@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>🎯 跳一跳</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:linear-gradient(180deg,#1a1a2e,#16213e,#0f3460);min-height:100vh;display:flex;flex-direction:column;align-items:center;color:#fff;user-select:none;-webkit-user-select:none;touch-action:none;overflow:hidden;position:fixed;inset:0}
+.header{width:100%;max-width:420px;padding:8px 16px 4px;display:flex;align-items:center;justify-content:space-between}
+.header .title{font-size:18px;font-weight:700;letter-spacing:1px}
+.header .score-wrap{display:flex;gap:16px;align-items:center}
+.header .score-label{font-size:10px;color:#8899aa}
+.header .score-val{font-size:22px;font-weight:800;line-height:1}
+.header .best{color:#ffd700}
+.game-wrap{flex:1;width:100%;max-width:420px;position:relative;overflow:hidden;margin:0 auto}
+#gameCanvas{display:block;width:100%;height:100%}
+
+/* ── 手指引导(角色上方) ── */
+.finger-guide{position:absolute;pointer-events:none;z-index:10;transition:opacity .3s}
+.finger-guide.hidden{opacity:0}
+.finger-guide .hand{font-size:48px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.6));animation:fingerDown 1s ease-in-out infinite;display:block;text-align:center}
+.finger-guide .label{font-size:14px;font-weight:800;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.8);text-align:center;margin-top:-6px}
+@keyframes fingerDown{0%,100%{transform:translateY(0)}50%{transform:translateY(12px)}}
+
+/* ── 全屏引导遮罩(首次/空闲3秒后) ── */
+.tutorial-overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:auto;transition:opacity .4s}
+.tutorial-overlay.hidden{opacity:0;pointer-events:none}
+.tutorial-overlay .tut-icon{font-size:72px;animation:fingerDown 1s ease-in-out infinite;margin-bottom:16px}
+.tutorial-overlay .tut-title{font-size:26px;font-weight:900;color:#ffd93d;text-shadow:0 2px 12px rgba(0,0,0,.5);margin-bottom:8px}
+.tutorial-overlay .tut-sub{font-size:15px;color:#ccc;margin-bottom:20px;text-align:center;line-height:1.8}
+.tutorial-overlay .tut-btn{padding:14px 40px;background:#ffd93d;color:#1a1a2e;border:none;border-radius:28px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4);transition:transform .15s}
+.tutorial-overlay .tut-btn:active{transform:scale(.93)}
+
+/* ── 力条(底部大号) ── */
+.power-bar-wrap{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);pointer-events:none;z-index:10;transition:opacity .25s;opacity:0}
+.power-bar-wrap.show{opacity:1}
+.power-bar-wrap .bar-bg{width:200px;height:14px;background:rgba(255,255,255,.12);border-radius:7px;overflow:hidden}
+.power-bar-wrap .bar-fill{height:100%;border-radius:7px;transition:width .05s linear;background:linear-gradient(90deg,#4d96ff,#ffd93d,#ff6b6b)}
+.power-bar-wrap .bar-pct{text-align:center;font-size:14px;font-weight:800;margin-top:4px;color:#ffd93d}
+.power-bar-wrap .bar-hint{text-align:center;font-size:11px;color:#8899aa;margin-top:2px}
+
+/* ── 松手提示 ── */
+.let-go{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);font-size:24px;font-weight:900;color:#ffd93d;text-shadow:0 2px 12px rgba(0,0,0,.5);pointer-events:none;z-index:10;opacity:0;transition:opacity .2s}
+.let-go.show{opacity:1;animation:letGoPulse .5s ease-in-out infinite}
+@keyframes letGoPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.1)}}
+
+/* ── 结束弹窗 ── */
+.result-popup{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);pointer-events:none;opacity:0;transition:opacity .3s;z-index:20}
+.result-popup.show{opacity:1;pointer-events:auto}
+.result-popup .rp-score{font-size:56px;font-weight:900;color:#ffd93d;text-shadow:0 4px 16px rgba(0,0,0,.5)}
+.result-popup .rp-label{font-size:14px;color:#8899aa;margin-bottom:4px}
+.result-popup .rp-best{font-size:15px;color:#fff;margin-top:4px}
+.result-popup .rp-btn{margin-top:28px;padding:14px 48px;background:#ffd93d;color:#1a1a2e;border:none;border-radius:28px;font-size:17px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3);transition:transform .15s}
+.result-popup .rp-btn:active{transform:scale(.93)}
+.result-popup .rp-sub{font-size:13px;color:#8899aa;margin-top:10px}
+
+/* ── 完美弹窗 ── */
+.perfect-pop{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:900;pointer-events:none;opacity:0;z-index:15;color:#ffd93d;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.perfect-pop.show{animation:popUp .8s ease-out forwards}
+@keyframes popUp{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-75%) scale(1)}}
+.combo-pop{position:absolute;top:28%;left:50%;transform:translate(-50%,-50%);font-size:20px;font-weight:700;pointer-events:none;opacity:0;z-index:15;color:#4d96ff;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.combo-pop.show{animation:popUp .8s ease-out forwards}
+
+.bottom-bar{width:100%;max-width:420px;padding:4px 16px 12px;display:flex;gap:10px}
+.btn{flex:1;padding:10px;border:none;border-radius:20px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn:active{transform:scale(.95)}
+.btn-restart{background:rgba(255,255,255,.1);color:#8899aa}
+.btn-home{background:#ffd700;color:#1a1a2e}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">🎯 跳一跳</div>
+  <div class="score-wrap">
+    <div style="text-align:center">
+      <div class="score-label">🏆 最高</div>
+      <div class="score-val best" id="bestScore">0</div>
+    </div>
+    <div style="text-align:center">
+      <div class="score-label">📊 分数</div>
+      <div class="score-val" id="score">0</div>
+    </div>
+  </div>
+</div>
+
+<div class="game-wrap" id="gameWrap">
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- 手指引导 -->
+  <div class="finger-guide" id="fingerGuide">
+    <div class="hand">👇</div>
+    <div class="label">按住蓄力</div>
+  </div>
+
+  <!-- 全屏教程遮罩 -->
+  <div class="tutorial-overlay" id="tutorialOverlay">
+    <div class="tut-icon">👇</div>
+    <div class="tut-title">按住蓄力 · 松手跳跃</div>
+    <div class="tut-sub">按住屏幕任意位置蓄力<br>松手后角色跳向前方平台<br>蓄力越久跳越远</div>
+    <button class="tut-btn" id="tutBtn">👆 开始游戏</button>
+  </div>
+
+  <!-- 松手提示 -->
+  <div class="let-go" id="letGo">松手跳跃! 🚀</div>
+
+  <!-- 力条 -->
+  <div class="power-bar-wrap" id="powerBarWrap">
+    <div class="bar-bg"><div class="bar-fill" id="powerBarFill" style="width:0%"></div></div>
+    <div class="bar-pct" id="powerBarPct"></div>
+    <div class="bar-hint">蓄力越久跳越远</div>
+  </div>
+
+  <!-- 结束弹窗 -->
+  <div class="result-popup" id="resultPopup">
+    <div class="rp-label">游戏结束</div>
+    <div class="rp-score" id="rpScore">0</div>
+    <div class="rp-best" id="rpBest"></div>
+    <button class="rp-btn" id="rpBtn">👆 再来一局</button>
+    <div class="rp-sub">按住蓄力 · 松手跳跃</div>
+  </div>
+
+  <!-- 完美/连击 -->
+  <div class="perfect-pop" id="perfectPop"></div>
+  <div class="combo-pop" id="comboPop"></div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-restart" id="btnRestart">🔄 重新开始</button>
+  <button class="btn btn-home" id="btnHome">🏠 游戏大厅</button>
+</div>
+
+<script>
+// ─── DOM refs
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('gameWrap');
+const fingerGuide = document.getElementById('fingerGuide');
+const tutorialOverlay = document.getElementById('tutorialOverlay');
+const letGo = document.getElementById('letGo');
+const powerBarWrap = document.getElementById('powerBarWrap');
+const powerBarFill = document.getElementById('powerBarFill');
+const powerBarPct = document.getElementById('powerBarPct');
+const resultPopup = document.getElementById('resultPopup');
+const rpScore = document.getElementById('rpScore');
+const rpBest = document.getElementById('rpBest');
+const perfectPop = document.getElementById('perfectPop');
+const comboPop = document.getElementById('comboPop');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('bestScore');
+
+// ─── State
+let W, H, cw, ch;
+let gameState = 'waiting'; // waiting | charging | jumping | landing | dead
+let score = 0;
+let best = parseInt(localStorage.getItem('jump_best') || '0');
+let combo = 0;
+let chargeStart = 0;
+let power = 0;
+const MAX_POWER = 100;
+const CHARGE_TIME = 1800; // ms to reach max power
+const MAX_JUMP_DIST = 380; // px at max power (~1.8s press)
+const MIN_JUMP_DIST = 200; // 从平台中心跳到下一个平台中心的最小距离
+let playerX, playerY, playerW = 40, playerH = 40;
+let platforms = [];
+let camX = 0;
+let jumpAnim = null;
+let particles = [];
+let shakeAmount = 0;
+let idleTimer = null;
+let fallVy = 0, fallAngle = 0, fallAngV = 0; // falling animation state
+
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  tutorialOverlay.classList.add('hidden');
+  idleTimer = setTimeout(() => {
+    if (gameState === 'waiting' && score === 0) {
+      tutorialOverlay.classList.remove('hidden');
+    }
+  }, 4000);
+}
+
+bestEl.textContent = best;
+
+// ─── Platform class
+function createPlatform(x, y, w) {
+  const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b','#845ef7','#20c997','#f06595'];
+  return {
+    x, y, w: w || 70 + Math.random() * 50,
+    h: 18,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    hasCenter: true,
+  };
+}
+
+// ─── Init
+function resize() {
+  const rect = wrap.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cw = W * dpr;
+  ch = H * dpr;
+  canvas.width = cw;
+  canvas.height = ch;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+}
+
+function initGame() {
+  platforms = [];
+  particles = [];
+  combo = 0;
+  score = 0;
+  scoreEl.textContent = '0';
+  camX = 0;
+  platforms.push(createPlatform(W * 0.08, H * 0.65, 90));
+  // First gap: 100-140px — even a tap covers (center→center ≈ 200px)
+  const gap1 = 100 + Math.random() * 40;
+  platforms.push(createPlatform(platforms[0].x + platforms[0].w + gap1, H * 0.62, 70 + Math.random() * 35));
+
+  playerX = platforms[0].x + platforms[0].w / 2;
+  playerY = platforms[0].y - playerH;
+  gameState = 'waiting';
+  power = 0;
+  jumpAnim = null;
+
+  // Show tutorial on first load
+  tutorialOverlay.classList.remove('hidden');
+  fingerGuide.classList.add('hidden');
+  resultPopup.classList.remove('show');
+  powerBarWrap.classList.remove('show');
+  letGo.classList.remove('show');
+}
+
+// ─── Spawn next platform
+function spawnNext() {
+  const last = platforms[platforms.length - 1];
+  const gap = 100 + Math.random() * 160;
+  const nextX = last.x + last.w + gap;
+  const yOffset = (Math.random() - 0.5) * 80;
+  const nextY = Math.max(H * 0.4, Math.min(H * 0.75, last.y + yOffset));
+  const nextW = 60 + Math.random() * 50;
+  platforms.push(createPlatform(nextX, nextY, nextW));
+}
+
+// ─── Jump
+function startJump(powerPct) {
+  gameState = 'jumping';
+  const dist = MIN_JUMP_DIST + (MAX_JUMP_DIST - MIN_JUMP_DIST) * powerPct;
+  const target = platforms[platforms.length - 1];
+  const startX = playerX;
+  const startY = playerY;
+  const endX = startX + dist;
+  const endY = target.y - playerH;
+  const peakY = Math.min(startY, endY) - 60 * powerPct;
+  const duration = 300 + 200 * powerPct;
+
+  const startTime = performance.now();
+  jumpAnim = { startX, startY, endX, endY, peakY, startTime, duration, target, dist };
+}
+
+function landingResult(target, playerCenterX) {
+  const halfW = target.w / 2;
+  const cx = target.x + halfW;
+  const distFromCenter = Math.abs(playerCenterX - cx);
+
+  if (distFromCenter > halfW + 10) {
+    return 'miss'; // Fell off
+  }
+  if (distFromCenter < halfW * 0.25) {
+    return 'perfect'; // Center hit
+  }
+  return 'ok';
+}
+
+function handleLanding(result) {
+  if (result === 'miss') {
+    // Edge-hit particles
+    spawnParticles(playerX + playerW / 2, playerY + playerH, 8);
+    // Start falling animation
+    gameState = 'falling';
+    fallVy = -4;  // initial upward bounce
+    fallAngle = 0;
+    fallAngV = 0;
+    fingerGuide.classList.add('hidden');
+    powerBarWrap.classList.remove('show');
+    letGo.classList.remove('show');
+    return;
+  }
+
+  combo++;
+  score++;
+  scoreEl.textContent = score;
+  if (score > best) {
+    best = score;
+    localStorage.setItem('jump_best', best);
+    bestEl.textContent = best;
+  }
+
+  if (result === 'perfect') {
+    score++;
+    scoreEl.textContent = score;
+    if (score > best) {
+      best = score; localStorage.setItem('jump_best', best); bestEl.textContent = best;
+    }
+    showPerfect();
+  }
+  if (combo >= 5 && combo % 5 === 0) showCombo(combo);
+
+  // Spawn next, cleanup old
+  spawnNext();
+  if (platforms.length > 4) platforms.shift();
+
+  // Back to waiting
+  gameState = 'waiting';
+  power = 0;
+  powerBarWrap.classList.remove('show');
+  letGo.classList.remove('show');
+  fingerGuide.classList.remove('hidden');
+  resetIdleTimer();
+}
+
+function die() {
+  gameState = 'dead';
+  shakeAmount = 12;
+  spawnParticles(playerX, playerY + playerH / 2);
+  fingerGuide.classList.add('hidden');
+  powerBarWrap.classList.remove('show');
+  letGo.classList.remove('show');
+
+  setTimeout(() => {
+    rpScore.textContent = score;
+    rpBest.textContent = best > 0 ? `🏆 最高纪录 ${best} 分` : '';
+    resultPopup.classList.add('show');
+  }, 500);
+}
+
+function showPerfect() {
+  const texts = ['完美!', 'Perfect!', '漂亮!', '厉害!', '💯'];
+  perfectPop.textContent = texts[Math.floor(Math.random() * texts.length)];
+  perfectPop.className = 'perfect-pop show';
+  setTimeout(() => perfectPop.className = 'perfect-pop', 800);
+}
+
+function showCombo(n) {
+  comboPop.textContent = `🔥 ${n}连击`;
+  comboPop.className = 'combo-pop show';
+  setTimeout(() => comboPop.className = 'combo-pop', 800);
+}
+
+function spawnParticles(x, y, count) {
+  count = count || 20;
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: -Math.random() * 10 - 2,
+      life: 1,
+      decay: 0.015 + Math.random() * 0.025,
+      size: 3 + Math.random() * 5,
+      color: ['#ff6b6b','#ffd93d','#fff','#4d96ff'][Math.floor(Math.random() * 4)],
+    });
+  }
+}
+
+// ─── Input
+function getPos(e) {
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX, y: t.clientY };
+}
+
+wrap.addEventListener('pointerdown', (e) => {
+  if (gameState === 'dead') { initGame(); return; }
+  tutorialOverlay.classList.add('hidden');
+  if (gameState !== 'waiting') return;
+  gameState = 'charging';
+  chargeStart = performance.now();
+  power = 0;
+  fingerGuide.classList.add('hidden');
+  powerBarWrap.classList.add('show');
+});
+
+wrap.addEventListener('pointerup', (e) => {
+  if (gameState !== 'charging') return;
+  const elapsed = performance.now() - chargeStart;
+  const pct = Math.min(1, elapsed / CHARGE_TIME);
+  const eased = pct < 0.2 ? pct * 2.5 : 0.5 + (pct - 0.2) * 0.625;
+  startJump(Math.min(1, eased));
+  power = 0;
+  letGo.classList.remove('show');
+  powerBarWrap.classList.remove('show');
+});
+
+wrap.addEventListener('pointerleave', () => {
+  if (gameState === 'charging') {
+    const elapsed = performance.now() - chargeStart;
+    startJump(Math.min(1, elapsed / CHARGE_TIME));
+    power = 0;
+    letGo.classList.remove('show');
+    powerBarWrap.classList.remove('show');
+  }
+});
+
+// ─── Render
+function drawPlatform(p) {
+  const x = p.x - camX;
+  const y = p.y;
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,.2)';
+  ctx.fillRect(x + 3, y + 3, p.w, p.h);
+  // Main body
+  const grad = ctx.createLinearGradient(x, y, x, y + p.h);
+  grad.addColorStop(0, p.color);
+  grad.addColorStop(1, p.color + '88');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, p.w, p.h);
+  // Top highlight
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.fillRect(x + 3, y + 1, p.w - 6, 4);
+  // Center marker
+  if (p.hasCenter && p.w > 40) {
+    const cx = x + p.w / 2;
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.beginPath();
+    ctx.arc(cx, y + p.h / 2, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.8)';
+    ctx.beginPath();
+    ctx.arc(cx, y + p.h / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPlayer(x, y, w, h, squish, rotation) {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rotation) ctx.rotate(rotation);
+  if (squish) ctx.scale(squish, 1 / squish);
+
+  // Body (bottle shape)
+  const bodyGrad = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+  bodyGrad.addColorStop(0, '#1a1a2e');
+  bodyGrad.addColorStop(0.5, '#2d3a5c');
+  bodyGrad.addColorStop(1, '#16213e');
+
+  // Main body
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2 + 2, -h / 2 + 8, w - 4, h - 16, 12);
+  ctx.fill();
+
+  // Head (circle top)
+  ctx.fillStyle = '#2d3a5c';
+  ctx.beginPath();
+  ctx.arc(0, -h / 2 + 14, w / 2 - 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(-8, -h / 2 + 12, 5, 0, Math.PI * 2);
+  ctx.arc(8, -h / 2 + 12, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.arc(-7, -h / 2 + 11, 2.5, 0, Math.PI * 2);
+  ctx.arc(9, -h / 2 + 11, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Smile
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, -h / 2 + 16, 6, 0.1 * Math.PI, 0.9 * Math.PI);
+  ctx.stroke();
+
+  // Bottom shadow
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath();
+  ctx.ellipse(0, h / 2 - 4, w / 2 - 6, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x - camX, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function render(now) {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0f3460';
+  ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(0.5, '#16213e');
+  grad.addColorStop(1, '#0f3460');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Floor line
+  ctx.strokeStyle = 'rgba(255,255,255,.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.8);
+  ctx.lineTo(W, H * 0.8);
+  ctx.stroke();
+
+  // Update charging
+  if (gameState === 'charging') {
+    power = Math.min(MAX_POWER, (now - chargeStart) / CHARGE_TIME * MAX_POWER);
+    powerBarFill.style.width = (power / MAX_POWER * 100) + '%';
+    powerBarPct.textContent = Math.round(power) + '%';
+    // Show "松手" when > 30%
+    if (power > 30) letGo.classList.add('show');
+    else letGo.classList.remove('show');
+  }
+  ctx.save();
+  if (shakeAmount > 0.01) {
+    const sx = (Math.random() - 0.5) * shakeAmount;
+    const sy = (Math.random() - 0.5) * shakeAmount;
+    ctx.translate(sx, sy);
+    shakeAmount *= 0.85;
+  }
+
+  // Draw platforms
+  for (const p of platforms) {
+    drawPlatform(p);
+  }
+
+  // Update & draw particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.3;
+    p.life -= p.decay;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  drawParticles();
+
+  // Update charging power
+  if (gameState === 'charging') {
+    power = Math.min(MAX_POWER, (now - chargeStart) / CHARGE_TIME * MAX_POWER);
+  }
+
+  // Update jump animation
+  if (jumpAnim) {
+    const elapsed = now - jumpAnim.startTime;
+    const t = Math.min(1, elapsed / jumpAnim.duration);
+    // Ease-out for x, parabolic for y
+    const et = 1 - Math.pow(1 - t, 3);
+    const px = jumpAnim.startX + (jumpAnim.endX - jumpAnim.startX) * et;
+    const py = jumpAnim.startY + (jumpAnim.endY - jumpAnim.startY) * t +
+      (jumpAnim.peakY - jumpAnim.startY) * 4 * t * (1 - t);
+
+    playerX = px;
+    playerY = py;
+
+    // Update camera
+    const targetCam = playerX - W * 0.3;
+    camX += (targetCam - camX) * 0.15;
+
+    if (t >= 1) {
+      // Landing
+      const result = landingResult(jumpAnim.target, playerX + playerW / 2);
+      playerY = jumpAnim.target.y - playerH;
+      playerX = Math.max(jumpAnim.target.x - 10, Math.min(jumpAnim.target.x + jumpAnim.target.w - playerW + 10, playerX));
+      jumpAnim = null;
+      handleLanding(result);
+    }
+  }
+
+  // Draw player
+  let squish = 1;
+  let fallAngleRender = 0;
+  if (gameState === 'charging') {
+    squish = 1 - power / MAX_POWER * 0.5;
+  } else if (gameState === 'falling') {
+    // Falling: gravity + rotation
+    fallVy += 0.5;  // gravity
+    playerY += fallVy;
+    playerX += 2;   // drift right
+    fallAngV += 0.03;
+    fallAngle += fallAngV;
+    fallAngleRender = fallAngle;
+    // When off screen → die
+    if (playerY > H + 80) {
+      die();
+      return;
+    }
+  } else if (jumpAnim) {
+    const t = (now - jumpAnim.startTime) / jumpAnim.duration;
+    if (t < 0.2) squish = 0.7;
+    else if (t > 0.85) squish = 0.8;
+  }
+  drawPlayer(playerX - camX, playerY, playerW, playerH, squish, fallAngleRender);
+
+  // Keep finger guide above player during waiting
+  if (gameState === 'waiting') {
+    fingerGuide.style.left = (playerX - camX - 20) + 'px';
+    fingerGuide.style.top = (playerY - 60) + 'px';
+  }
+
+  ctx.restore();
+
+  requestAnimationFrame(render);
+}
+
+// ─── Buttons: stop ALL pointer events from buttons reaching gameWrap
+['btnRestart','btnHome','rpBtn','tutBtn'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.addEventListener('pointerdown',e=>e.stopPropagation());
+  el.addEventListener('pointerup',e=>e.stopPropagation());
+});
+
+document.getElementById('btnRestart').addEventListener('click', (e) => { initGame(); });
+document.getElementById('btnHome').addEventListener('click', (e) => { location.href = '/nav'; });
+document.getElementById('rpBtn').addEventListener('click', (e) => { initGame(); });
+document.getElementById('tutBtn').addEventListener('click', (e) => {
+  tutorialOverlay.classList.add('hidden');
+  resetIdleTimer();
+  fingerGuide.classList.remove('hidden');
+});
+
+// ─── Start
+resize();
+initGame();
+requestAnimationFrame(render);
+window.addEventListener('resize', () => { resize(); initGame(); });
+</script>
+</body>
+</html>

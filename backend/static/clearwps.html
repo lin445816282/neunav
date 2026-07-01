@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WPS 缓存清理 - 一键释放磁盘空间</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    background: linear-gradient(180deg, #f0f9ff 0%, #f8fafc 40%, #f0f4ff 100%);
+    color: #1e293b;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── 顶部彩条 ─── */
+  .top-strip {
+    height: 4px;
+    background: linear-gradient(90deg, #0ea5e9, #6366f1, #06b6d4);
+  }
+
+  /* ─── 主体 ─── */
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 30px 24px 40px;
+    text-align: center;
+  }
+
+  /* ─── 图标 ─── */
+  .icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, #e0f2fe, #e0e7ff);
+    border-radius: 14px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 12px rgba(14,165,233,0.1);
+  }
+  .icon-wrap svg { width: 26px; height: 26px; color: #0ea5e9; }
+
+  /* ─── 标题 ─── */
+  h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    color: #0f172a;
+  }
+  .subhead {
+    font-size: 16px;
+    color: #64748b;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .subhead strong { color: #0ea5e9; font-weight: 700; }
+
+  /* ─── 方式标签 ─── */
+  .method-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    margin-top: 10px;
+  }
+  .method-label:first-of-type { margin-top: 0; }
+
+  /* ─── 下载按钮 ─── */
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 360px;
+    padding: 18px 32px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    letter-spacing: -0.3px;
+    box-shadow: 0 4px 20px rgba(14,165,233,0.3), 0 1px 3px rgba(0,0,0,0.06);
+    transition: all 0.25s;
+    margin-bottom: 12px;
+  }
+  .btn-download:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(14,165,233,0.4);
+  }
+  .btn-download:active { transform: translateY(0); }
+
+  .btn-download svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+  /* ─── 复制代码 ─── */
+  .btn-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all 0.15s;
+    margin-bottom: 14px;
+  }
+  .btn-copy:hover { color: #0ea5e9; background: rgba(14,165,233,0.06); }
+  .btn-copy svg { width: 16px; height: 16px; }
+
+  /* ─── 使用步骤 ─── */
+  .steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 22px;
+    white-space: nowrap;
+    font-size: 14px;
+    color: #475569;
+  }
+  .step b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    font-size: 12px;
+    color: #fff;
+    background: #0ea5e9;
+    margin-right: 4px;
+  }
+  .step-arrow { color: #cbd5e1; font-size: 16px; }
+
+  @media (max-width: 400px) {
+    .container { padding: 24px 16px 24px; }
+    h1 { font-size: 24px; }
+    .steps { gap: 8px; font-size: 13px; }
+  }
+
+  /* ─── 保存说明 ─── */
+  .save-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #92400e;
+    line-height: 1.6;
+    text-align: left;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .save-note strong { color: #b45309; }
+
+  /* ─── 特性 ─── */
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .feature {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #475569;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 16px;
+  }
+  .feature svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .feature .green { color: #10b981; }
+  .feature .blue  { color: #0ea5e9; }
+  .feature .purple { color: #6366f1; }
+
+  /* ─── 网址分享栏 ─── */
+  .url-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #64748b;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .url-bar code {
+    font-family: 'SF Mono','Fira Code',monospace;
+    font-size: 12px;
+    color: #0ea5e9;
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .url-bar .copy-link {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0ea5e9;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .url-bar .copy-link:hover { background: #e0f2fe; }
+
+  /* ─── 底部 ─── */
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: #94a3b8;
+    padding: 20px;
+  }
+  footer a { color: #0ea5e9; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .divider {
+    width: 40px; height: 1px;
+    background: #e2e8f0;
+    margin: 0 auto 14px;
+  }
+
+  /* ─── Toast ─── */
+  .toast {
+    position: fixed;
+    top: 24px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: #0f172a;
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    z-index: 99;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+    pointer-events: none;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 返回导航 — 可拖拽 */
+.back-nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;
+  display:flex;align-items:center;gap:6px;touch-action:none;cursor:grab;user-select:none;
+  background:linear-gradient(135deg,rgba(99,102,241,.20),rgba(6,182,212,.14));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-radius:22px;padding:4px 6px;
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 2px 16px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.04);
+  transition:box-shadow .2s,opacity .3s}
+.back-nav:active{cursor:grabbing;box-shadow:0 4px 24px rgba(99,102,241,.15),inset 0 1px 0 rgba(255,255,255,.04)}
+.back-nav.hide{opacity:0;pointer-events:none}
+.back-nav .bn-link{color:#000;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:4px;font-weight:600;white-space:nowrap;letter-spacing:.3px}
+.back-nav .bn-divider{width:1px;height:14px;background:rgba(0,0,0,.08);border-radius:1px}
+.back-nav .bn-close{width:22px;height:22px;border-radius:50%;border:none;
+  background:rgba(0,0,0,.06);color:#000;font-size:12px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.back-nav .bn-close:hover{background:rgba(0,0,0,.10);color:#000}
+</style>
+</head>
+<body>
+<div class="back-nav" id="backNav">
+  <a href="/nav" class="bn-link">🏠 导航</a>
+  <span class="bn-divider"></span>
+  <button class="bn-close" id="bnClose">×</button>
+</div>
+
+<div class="top-strip"></div>
+
+<div class="container">
+  <!-- 图标 -->
+  <div class="icon-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="9" y1="15" x2="15" y2="15"/>
+      <polyline points="3 7 5 5 7 7"/>
+      <polyline points="17 7 19 5 21 7"/>
+    </svg>
+  </div>
+
+  <!-- 标题 -->
+  <h1>WPS 缓存清理</h1>
+  <p class="subhead">
+    WPS 用久了越来越卡？<br>
+    下载这个文件，<strong>双击运行</strong>，瞬间清爽。
+  </p>
+
+  <!-- 方式一：下载 -->
+  <div class="method-label">方式一</div>
+  <a class="btn-download" href="javascript:void(0)" onclick="doDownload()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    下载 WPS清理.bat
+  </a>
+
+  <!-- 使用步骤 -->
+  <div class="steps">
+    <span class="step"><b>1</b> 下载文件</span>
+    <span class="step-arrow">→</span>
+    <span class="step"><b>2</b> 双击运行</span>
+    <span class="step-arrow">→</span>
+    <span class="step"><b>3</b> 完成</span>
+  </div>
+
+  <!-- 方式二：复制 -->
+  <div class="method-label">方式二</div>
+  <button class="btn-copy" onclick="copyCode()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <rect x="9" y="9" width="13" height="13" rx="2"/>
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+    </svg>
+    复制代码
+  </button>
+
+  <!-- 保存说明 -->
+  <div class="save-note">
+    <span>💡</span>
+    <span>复制代码后：记事本粘贴 → 另存为 <strong>WPS清理.bat</strong>（编码选 <strong>ANSI</strong>）</span>
+  </div>
+
+  <!-- 网址分享 -->
+  <div class="url-bar">
+    <span>🔗</span>
+    <code id="pageUrl">www.ct256.cn/clearwps</code>
+    <button class="copy-link" onclick="copyUrl()">复制链接</button>
+  </div>
+
+  <!-- 特性 -->
+  <div class="features">
+    <div class="feature">
+      <svg class="green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+      安全，不删文档
+    </div>
+    <div class="feature">
+      <svg class="blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      无需安装任何软件
+    </div>
+    <div class="feature">
+      <svg class="purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      适用所有 Windows
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <footer>
+    只清理 WPS 备份、缓存、日志文件<br>
+    不会影响你的模板、词典和云文档
+  </footer>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════ 返回导航拖拽 ═══════
+(function(){
+  const nav=document.getElementById('backNav');
+  const close=document.getElementById('bnClose');
+  let dragging=false,ox=0,oy=0,nx=0,ny=0;
+  close.addEventListener('click',e=>{e.stopPropagation();nav.classList.add('hide')});
+  nav.addEventListener('pointerdown',e=>{
+    if(e.target===close)return;
+    dragging=true;nav.style.transition='none';
+    const r=nav.getBoundingClientRect();
+    ox=e.clientX-r.left;oy=e.clientY-r.top;
+    nav.setPointerCapture(e.pointerId);
+  });
+  nav.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    nx=e.clientX-ox;ny=e.clientY-oy;
+    nav.style.left=nx+'px';nav.style.top=ny+'px';nav.style.transform='none';
+  });
+  nav.addEventListener('pointerup',()=>{
+    dragging=false;nav.style.transition='box-shadow .2s,opacity .3s';
+  });
+})();
+
+const BAT_BASE64 = "QGVjaG8gb2ZmDQpjZCAvZCBDOlwgDQpjaGNwIDkzNiA+bnVsDQpzZXRsb2NhbCBlbmFibGVkZWxheWVkZXhwYW5zaW9uDQoNCmVjaG8uDQplY2hvICAgKy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0rDQplY2hvICAgXnwgICBXUFMgu7q05tK7vPzH5cDtuaS+3yB2Mi4wICAgICAgICAgIF58DQplY2hvICAgXnwgICC0vyBCYXQgLSDB49LAwLUgLSDLq7v3vLTTwyAgICAgICAgIF58DQplY2hvICAgKy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0rDQplY2hvLg0KZWNobyAgINPDu6c6ICVVU0VSTkFNRSUNCmVjaG8uDQoNCjo6IC0tLSAxLiC52LHVIFdQUyC9+LPMIC0tLQ0KZWNobyAgIFsxLzNdILnYsdUgV1BTIL34s8wuLi4NCg0Kc2V0ICJraWxsZWQ9Ig0KZm9yICUlcCBpbiAod3BzLmV4ZSB3cHNvZmZpY2UuZXhlIGV0LmV4ZSB3cHAuZXhlIHdwc3BkZi5leGUgd3BzY2xvdWRzdnIuZXhlIHdwc2NlbnRlci5leGUgd3BzbWFpbi5leGUgd3BzdXBkYXRlLmV4ZSkgZG8gKA0KICAgIHRhc2traWxsIC9mIC9pbSAlJXAgPm51bCAyPiYxDQogICAgaWYgIWVycm9ybGV2ZWwhIGVxdSAwICgNCiAgICAgICAgaWYgZGVmaW5lZCBraWxsZWQgKHNldCAia2lsbGVkPSFraWxsZWQhLCAlJXAiKSBlbHNlIChzZXQgImtpbGxlZD0lJXAiKQ0KICAgICkNCikNCmlmIGRlZmluZWQga2lsbGVkICgNCiAgICBlY2hvICAgICAgICAg0tHW1da5OiAha2lsbGVkIQ0KKSBlbHNlICgNCiAgICBlY2hvICAgICAgICAgw7vT0NTL0NDW0LXEIFdQUyC9+LPMDQopDQoNCjo6IC0tLSAyLiDH5cDtu7q05iAtLS0NCmVjaG8uDQplY2hvICAgWzIvM10gx+XA7bu6tObEv8K8Li4uDQoNCnNldCAiUk9BTUlORz0lQVBQREFUQSVcS2luZ3NvZnRcb2ZmaWNlNiINCnNldCAib2s9MCINCnNldCAic2tpcD0wIg0KDQpmb3IgJSVEIGluICgNCiAgICAiYmFja3VwIiAiY2FjaGUiICJsb2ciICJtZWRpYWNhY2hlIiAidHJhY2UiDQogICAgInVwZGF0ZSIgInRpYW5jZSIgImtjY3Nka2JhayINCikgZG8gKA0KICAgIHNldCAiRElSPSVST0FNSU5HJVwlJX5EIg0KICAgIGlmIGV4aXN0ICIhRElSISIgKA0KICAgICAgICByZCAvcyAvcSAiIURJUiEiIDI+bnVsDQogICAgICAgIGlmIGV4aXN0ICIhRElSISIgKA0KICAgICAgICAgICAgZWNobyAgICAgICAgIFggJSV+RCAgIMz4uf0gXiiyv7fWzsS8/rG71bzTw14pDQogICAgICAgICAgICBzZXQgL2Egc2tpcCs9MQ0KICAgICAgICApIGVsc2UgKA0KICAgICAgICAgICAgZWNobyAgICAgICAgIFYgJSV+RCAgINLRx+XA7Q0KICAgICAgICAgICAgc2V0IC9hIG9rKz0xDQogICAgICAgICkNCiAgICApDQopDQoNCjo6IMHZyrHEv8K8DQpmb3IgJSVUIGluICh3cHMgd3BzcmVtaXhzZGspIGRvICgNCiAgICBzZXQgIlRESVI9JUxPQ0FMQVBQREFUQSVcVGVtcFwlJVQiDQogICAgaWYgZXhpc3QgIiFURElSISIgKA0KICAgICAgICByZCAvcyAvcSAiIVRESVIhIiAyPm51bA0KICAgICAgICBpZiBleGlzdCAiIVRESVIhIiAoDQogICAgICAgICAgICBlY2hvICAgICAgICAgWCBUZW1wLyUlVCAgIMz4uf0NCiAgICAgICAgICAgIHNldCAvYSBza2lwKz0xDQogICAgICAgICkgZWxzZSAoDQogICAgICAgICAgICBlY2hvICAgICAgICAgViBUZW1wLyUlVCAgINLRx+XA7Q0KICAgICAgICAgICAgc2V0IC9hIG9rKz0xDQogICAgICAgICkNCiAgICApDQopDQoNCjo6IC0tLSAzLiDUxs7EvP67urTmIC0tLQ0KZWNoby4NCmVjaG8gICBbMy8zXSDH5cDt1MbOxLz+u7q05i4uLg0KDQpzZXQgIkNMT1VEPSVMT0NBTEFQUERBVEElXEtpbmdzb2Z0XFdQUyBDbG91ZCBGaWxlcyINCmlmIG5vdCBleGlzdCAiJUNMT1VEJSIgKA0KICAgIGVjaG8gICAgICAgICDOtNXStb0gV1BTIENsb3VkIEZpbGVzIMS/wrwNCiAgICBnb3RvIDpkb25lDQopDQoNCmZvciAvZCAlJUggaW4gKCIlQ0xPVUQlXC4qIiAiJUNMT1VEJVx+KiIpIGRvICgNCiAgICBpZiBleGlzdCAiJSVIIiAoDQogICAgICAgIHJkIC9zIC9xICIlJUgiIDI+bnVsDQogICAgICAgIGlmIGV4aXN0ICIlJUgiICgNCiAgICAgICAgICAgIGVjaG8gICAgICAgICBYICUlfm54SCAgIMz4uf0NCiAgICAgICAgICAgIHNldCAvYSBza2lwKz0xDQogICAgICAgICkgZWxzZSAoDQogICAgICAgICAgICBlY2hvICAgICAgICAgViAlJX5ueEggICDS0cflwO0NCiAgICAgICAgICAgIHNldCAvYSBvays9MQ0KICAgICAgICApDQogICAgKQ0KKQ0KDQo6ZG9uZQ0KOjogLS0tIL3hufsgLS0tDQplY2hvLg0KZWNobyAgID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQ0KaWYgJW9rJSBlcXUgMCBpZiAlc2tpcCUgZXF1IDAgKA0KICAgIGVjaG8gICBPSyBXUFMgu7q05tLRvq263LjJvrujrM7e0OjH5cDto6ENCikgZWxzZSAoDQogICAgZWNobyAgIE9LIM3qs8mjodLRx+XA7SAlb2slILj2xL/CvA0KICAgIGlmICVza2lwJSBndHIgMCBlY2hvICAgISEgJXNraXAlILj2xL/CvMz4uf0gXijOxLz+sbtXUFPVvNPDXikNCikNCmVjaG8gICA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0NCmVjaG8uDQplY2hvICAgsLTIztLivPy52LHVLi4uDQpwYXVzZSA+bnVsDQpleGl0IC9iDQo=";
+
+const BAT_TEXT = "@echo off\r\ncd /d C:\\ \r\nchcp 936 >nul\r\nsetlocal enabledelayedexpansion\r\n\r\necho.\r\necho   +-------------------------------------+\r\necho   ^|   WPS \u7f13\u5b58\u4e00\u952e\u6e05\u7406\u5de5\u5177 v2.0          ^|\r\necho   ^|   \u7eaf Bat - \u96f6\u4f9d\u8d56 - \u53cc\u51fb\u5373\u7528         ^|\r\necho   +-------------------------------------+\r\necho.\r\necho   \u7528\u6237: %USERNAME%\r\necho.\r\n\r\n:: --- 1. \u5173\u95ed WPS \u8fdb\u7a0b ---\r\necho   [1/3] \u5173\u95ed WPS \u8fdb\u7a0b...\r\n\r\nset \"killed=\"\r\nfor %%p in (wps.exe wpsoffice.exe et.exe wpp.exe wpspdf.exe wpscloudsvr.exe wpscenter.exe wpsmain.exe wpsupdate.exe) do (\r\n    taskkill /f /im %%p >nul 2>&1\r\n    if !errorlevel! equ 0 (\r\n        if defined killed (set \"killed=!killed!, %%p\") else (set \"killed=%%p\")\r\n    )\r\n)\r\nif defined killed (\r\n    echo         \u5df2\u7ec8\u6b62: !killed!\r\n) else (\r\n    echo         \u6ca1\u6709\u8fd0\u884c\u4e2d\u7684 WPS \u8fdb\u7a0b\r\n)\r\n\r\n:: --- 2. \u6e05\u7406\u7f13\u5b58 ---\r\necho.\r\necho   [2/3] \u6e05\u7406\u7f13\u5b58\u76ee\u5f55...\r\n\r\nset \"ROAMING=%APPDATA%\\Kingsoft\\office6\"\r\nset \"ok=0\"\r\nset \"skip=0\"\r\n\r\nfor %%D in (\r\n    \"backup\" \"cache\" \"log\" \"mediacache\" \"trace\"\r\n    \"update\" \"tiance\" \"kccsdkbak\"\r\n) do (\r\n    set \"DIR=%ROAMING%\\%%~D\"\r\n    if exist \"!DIR!\" (\r\n        rd /s /q \"!DIR!\" 2>nul\r\n        if exist \"!DIR!\" (\r\n            echo         X %%~D   \u8df3\u8fc7 ^(\u90e8\u5206\u6587\u4ef6\u88ab\u5360\u7528^)\r\n            set /a skip+=1\r\n        ) else (\r\n            echo         V %%~D   \u5df2\u6e05\u7406\r\n            set /a ok+=1\r\n        )\r\n    )\r\n)\r\n\r\n:: \u4e34\u65f6\u76ee\u5f55\r\nfor %%T in (wps wpsremixsdk) do (\r\n    set \"TDIR=%LOCALAPPDATA%\\Temp\\%%T\"\r\n    if exist \"!TDIR!\" (\r\n        rd /s /q \"!TDIR!\" 2>nul\r\n        if exist \"!TDIR!\" (\r\n            echo         X Temp/%%T   \u8df3\u8fc7\r\n            set /a skip+=1\r\n        ) else (\r\n            echo         V Temp/%%T   \u5df2\u6e05\u7406\r\n            set /a ok+=1\r\n        )\r\n    )\r\n)\r\n\r\n:: --- 3. \u4e91\u6587\u4ef6\u7f13\u5b58 ---\r\necho.\r\necho   [3/3] \u6e05\u7406\u4e91\u6587\u4ef6\u7f13\u5b58...\r\n\r\nset \"CLOUD=%LOCALAPPDATA%\\Kingsoft\\WPS Cloud Files\"\r\nif not exist \"%CLOUD%\" (\r\n    echo         \u672a\u627e\u5230WPS Cloud Files\u76ee\u5f55\r\n    goto :done\r\n)\r\n\r\nfor /d %%H in (\"%CLOUD%\\.*\" \"%CLOUD%\\~*\") do (\r\n    if exist \"%%H\" (\r\n        rd /s /q \"%%H\" 2>nul\r\n        if exist \"%%H\" (\r\n            echo         X %%~nxH   \u8df3\u8fc7\r\n            set /a skip+=1\r\n        ) else (\r\n            echo         V %%~nxH   \u5df2\u6e05\u7406\r\n            set /a ok+=1\r\n        )\r\n    )\r\n)\r\n\r\n:done\r\n:: --- \u7ed3\u679c ---\r\necho.\r\necho   ==========================================\r\nif %ok% equ 0 if %skip% equ 0 (\r\n    echo   OK WPS \u7f13\u5b58\u5df2\u7ecf\u5f88\u5e72\u51c0\uff0c\u65e0\u9700\u6e05\u7406\uff01\r\n) else (\r\n    echo   OK \u5b8c\u6210\uff01\u5df2\u6e05\u7406 %ok% \u4e2a\u76ee\u5f55\r\n    if %skip% gtr 0 echo   !! %skip% \u4e2a\u76ee\u5f55\u8df3\u8fc7 ^(\u6587\u4ef6\u88abWPS\u5360\u7528^)\r\n)\r\necho   ==========================================\r\necho.\r\necho   \u6309\u4efb\u610f\u952e\u5173\u95ed...\r\npause >nul\r\nexit /b";
+
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+function doDownload() {
+  var raw = atob(BAT_BASE64);
+  var bytes = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  var blob = new Blob([bytes], { type: 'application/octet-stream' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'WPS\u6e05\u7406.bat';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('\u2714 \u4e0b\u8f7d\u6210\u529f\uff01\u627e\u5230\u6587\u4ef6\u53cc\u51fb\u8fd0\u884c');
+}
+
+function copyCode() {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(BAT_TEXT).then(function() {
+      toast('\u2714 \u5df2\u590d\u5236\uff01\u6253\u5f00\u8bb0\u4e8b\u672c\u7c98\u8d34\uff0c\u4fdd\u5b58\u4e3a WPS\u6e05\u7406.bat');
+    }).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+}
+
+function fallbackCopy() {
+  var ta = document.createElement('textarea');
+  ta.value = BAT_TEXT;
+  ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  toast('\u2714 \u5df2\u590d\u5236\uff01');
+}
+
+// ── 网址：动态读取真实URL，换域名自动适配 ──
+(function(){
+  var el = document.getElementById('pageUrl');
+  if (el) el.textContent = location.host + location.pathname;
+})();
+
+function copyUrl() {
+  var url = location.href;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function(){
+      toast('\u2714 \u94fe\u63a5\u5df2\u590d\u5236\uff0c\u53d1\u7ed9\u670b\u53cb\u5373\u53ef');
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('\u2714 \u5df2\u590d\u5236');
+  }
+}
+</script>
+</body>
+</html>

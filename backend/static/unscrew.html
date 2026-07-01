@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>萌糖消了个消 - ct256.cn</title>
+<style>
+
+:root { --w: min(96vw,440px); --h: min(96vw,440px); }
+
+* { margin: 0px; padding: 0px; box-sizing: border-box; }
+
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: linear-gradient(rgb(12, 12, 29) 0%, rgb(22, 22, 46) 40%, rgb(13, 13, 31) 100%); color: rgb(224, 224, 224); height: 100dvh; display: flex; flex-direction: column; align-items: center; overflow: hidden; user-select: none; touch-action: manipulation; }
+
+.back-nav { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 6px; touch-action: none; cursor: grab; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.18)); backdrop-filter: blur(12px); border-radius: 22px; padding: 4px 8px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 16px; }
+
+.back-nav:active { cursor: grabbing; }
+
+.back-nav.dragging { transition: none; }
+
+.back-nav .bn-link { color: rgb(224, 231, 255); font-size: 12px; text-decoration: none; font-weight: 600; white-space: nowrap; }
+
+.back-nav .bn-divider { width: 1px; height: 14px; background: rgba(255, 255, 255, 0.15); }
+
+.back-nav .bn-close { width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.5); font-size: 12px; cursor: pointer; flex-shrink: 0; }
+
+.top-bar { display: flex; justify-content: space-between; align-items: center; width: var(--w); padding: 4px 4px 6px; flex-shrink: 0; position: relative; z-index: 2; }
+
+.level-badge { font-size: 14px; font-weight: 700; color: rgb(199, 210, 254); background: rgba(99, 102, 241, 0.2); padding: 4px 14px; border-radius: 20px; letter-spacing: 0.5px; cursor:pointer; user-select:none; }
+
+.sound-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.1); color: rgb(165, 180, 252); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+.sound-btn.muted { color: rgb(107, 114, 128); background: rgba(255, 255, 255, 0.05); }
+
+.theme-picker { display:none; position:fixed; z-index:30; background:rgba(18,18,40,.94); backdrop-filter:blur(14px); border-radius:14px; padding:12px; border:1px solid rgba(255,255,255,.08); box-shadow:0 4px 24px rgba(0,0,0,.4); min-width:130px; }
+.theme-picker.show { display:block; }
+.theme-picker-title { font-size:12px; color:#94a3b8; margin-bottom:8px; text-align:center; font-weight:600; }
+.theme-picker .tm-btn { display:block; width:100%; padding:7px 10px; margin:2px 0; border:none; border-radius:8px; background:rgba(255,255,255,.04); color:#cbd5e1; font-size:13px; cursor:pointer; text-align:center; transition:.15s; }
+.theme-picker .tm-btn:active,.theme-picker .tm-btn.active { background:rgba(99,102,241,.25); color:#c7d2fe; }
+
+.level-picker{display:none;position:fixed;z-index:30;background:rgba(18,18,40,.94);backdrop-filter:blur(14px);border-radius:14px;padding:12px;border:1px solid rgba(255,255,255,.08);box-shadow:0 4px 24px rgba(0,0,0,.4);min-width:140px;}
+.level-picker.show{display:block;}
+.level-picker-title{font-size:12px;color:#94a3b8;margin-bottom:8px;text-align:center;font-weight:600;}
+.level-picker-list{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;}
+.level-picker-item{display:block;width:100%;padding:8px 12px;border:none;border-radius:8px;background:rgba(255,255,255,.04);color:#cbd5e1;font-size:13px;cursor:pointer;text-align:center;transition:.15s;}
+.level-picker-item:active,.level-picker-item.current{background:rgba(99,102,241,.25);color:#c7d2fe;}
+.level-picker-item.locked{opacity:.35;cursor:not-allowed;color:#64748b;}
+
+
+.checkin-bar { display: flex; justify-content: flex-start; width: var(--w); padding: 4px 4px; flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,.06); position: relative; z-index: 2; }
+.checkin-bar-btn { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 13px; border: 1px solid rgba(251,191,36,.35); background: linear-gradient(135deg, rgba(251,191,36,.2), rgba(245,158,11,.12)); color: #fbbf24; cursor: pointer; letter-spacing: 0.5px; }
+.checkin-bar-btn:active { background: rgba(251,191,36,.35); transform: scale(.96); }
+
+.score { font-size: 19px; font-weight: 800; color: rgb(251, 191, 36); text-shadow: rgba(251, 191, 36, 0.15) 0px 0px 12px; position: relative; }
+
+.board-wrap { flex: 1 1 0%; display: flex; align-items: center; justify-content: center; width: 100%; overflow: hidden; margin-top: -45px; position: relative; z-index: 0; }
+
+.board { position: relative; width: var(--w); height: var(--h); border-radius: 14px; flex-shrink: 0; overflow: hidden; background: linear-gradient(175deg, rgb(200, 155, 94) 0%, rgb(212, 169, 106) 15%, rgb(192, 144, 80) 30%, rgb(184, 131, 69) 55%, rgb(160, 112, 56) 80%, rgb(138, 96, 40) 100%); border: 6px solid rgb(90, 58, 26); box-shadow: rgb(42, 24, 8) 0px 0px 0px 3px, rgba(0, 0, 0, 0.55) 0px 8px 40px, rgba(255, 255, 255, 0.08) 0px 1px 0px inset; }
+
+.board::before { content: ""; position: absolute; inset: 6px; border-radius: 8px; pointer-events: none; background: repeating-linear-gradient(2deg, transparent, transparent 5px, rgba(120, 70, 30, 0.06) 5px, rgba(120, 70, 30, 0.06) 6px), repeating-linear-gradient(94deg, transparent, transparent 28px, rgba(0, 0, 0, 0.04) 28px, rgba(0, 0, 0, 0.04) 30px), repeating-linear-gradient(176deg, transparent, transparent 40px, rgba(180, 130, 80, 0.05) 40px, rgba(180, 130, 80, 0.05) 42px); }
+
+.board::after { content: ""; position: absolute; inset: 0px; border-radius: 10px; pointer-events: none; box-shadow: rgba(0, 0, 0, 0.15) 0px 2px 8px inset, rgba(0, 0, 0, 0.1) 0px -2px 4px inset; }
+
+.board-cleared { position: absolute; inset: 0px; z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55); border-radius: 10px; gap: 16px; }
+
+.board-cleared.show { display: flex; }
+
+.bc-text { font-size: 36px; font-weight: 800; color: rgb(251, 191, 36); text-shadow: rgba(251, 191, 36, 0.3) 0px 2px 12px; }
+
+.bc-btn { font-size: 15px; width: auto !important; padding: 10px 36px !important; }
+
+.pause-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(0, 0, 0, 0.35); color: rgb(170, 170, 170); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+
+.pause-bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; width: var(--w); padding: 4px 2px; flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,.06); position: relative; z-index: 2; }
+
+.pause-btn:active { background: rgba(255, 255, 255, 0.15); color: rgb(255, 255, 255); }
+
+.pause-overlay { position: absolute; inset: 0px; z-index: 18; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.65); border-radius: 10px; gap: 14px; }
+
+.pause-overlay.show { display: flex; }
+
+.pause-icon { font-size: 48px; }
+
+.pause-title { font-size: 20px; font-weight: 700; color: rgb(224, 224, 224); margin-bottom: 4px; }
+
+.screw { position: absolute; border-radius: 50%; cursor: pointer; transform: translate(-50%, -50%); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s; z-index: 1; will-change: transform; contain: layout style paint; -webkit-tap-highlight-color: transparent; outline: none; -webkit-user-select: none; user-select: none; opacity: 1; padding: 4px; margin: -4px; background-clip: content-box; box-sizing: content-box; }
+
+.screw:not(.blocked):active { transform: translate(-50%, -50%) scale(0.82) !important; }
+
+.screw.blocked { opacity: var(--layer-opacity, 0.55); pointer-events: none; z-index: 0; }
+
+/* --- 色盲友好纹理 --- */
+.pat-crosshatch::after { content:""; position:absolute; inset:0; border-radius:50%; background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.15) 3px,rgba(0,0,0,.15) 4px),repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,.15) 3px,rgba(0,0,0,.15) 4px); }
+.pat-diagonal::after { content:""; position:absolute; inset:0; border-radius:50%; background: repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.18) 3px,rgba(0,0,0,.18) 5px); }
+.pat-dots::after { content:""; position:absolute; inset:0; border-radius:50%; background: radial-gradient(circle,rgba(0,0,0,.15) 1.5px,transparent 2px); background-size: 6px 6px; }
+.pat-vstripes::after { content:""; position:absolute; inset:0; border-radius:50%; background: repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,.2) 3px,rgba(0,0,0,.2) 4.5px); }
+.pat-concentric::after { content:""; position:absolute; inset:0; border-radius:50%; background: repeating-radial-gradient(circle,rgba(0,0,0,.12) 0,rgba(0,0,0,.12) 2px,transparent 2px,transparent 5px); }
+.pat-checker::after { content:""; position:absolute; inset:0; border-radius:50%; background: conic-gradient(rgba(0,0,0,.12) 0 25%,transparent 25% 50%,rgba(0,0,0,.12) 50% 75%,transparent 75% 100%); background-size: 8px 8px; }
+.pat-hstripes::after { content:""; position:absolute; inset:0; border-radius:50%; background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.2) 3px,rgba(0,0,0,.2) 4.5px); }
+.pat-waves::after { content:""; position:absolute; inset:0; border-radius:50%; background: repeating-radial-gradient(circle at 3px 3px,rgba(0,0,0,.18) 0,rgba(0,0,0,.18) 1.5px,transparent 1.5px,transparent 5px); }
+
+.screw.removing { opacity: 0 !important; pointer-events: none; animation: screwPop 0.28s ease-out forwards; }
+
+@keyframes screwPop {
+  0%   { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  20%  { transform: translate(-50%, -50%) scale(1.2) rotate(10deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.1) rotate(55deg) translateY(-40px); opacity: 0; }
+}
+
+/* --- 消除粒子 --- */
+.match-particle { position: absolute; border-radius: 50%; pointer-events: none; z-index: 25; animation: particleBurst 0.5s ease-out forwards; }
+@keyframes particleBurst {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+  100% { transform: translate(var(--px), var(--py)) scale(0); opacity: 0; }
+}
+
+.screw.unlocking { animation: 0.7s ease-out 0s 1 normal none running unlockPulse; }
+
+
+.screw-inner { width: 100%; height: 100%; border-radius: 50%; position: relative; box-shadow: rgba(0, 0, 0, 0.25) 0px 4px 12px, rgba(255, 255, 255, 0.35) 0px 3px 6px inset; }
+
+.screw:not(.blocked) .screw-inner::before { content: ""; position: absolute; top: 12%; left: 18%; width: 30%; height: 24%; border-radius: 50%; background: rgba(255, 255, 255, 0.45); transform: rotate(-15deg); }
+
+.screw-inner::after { content: ""; position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); width: 56%; height: 36%; background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 26% 40%, rgb(26, 26, 26) 18%, transparent 19%), radial-gradient(circle at 74% 40%, rgb(26, 26, 26) 18%, transparent 19%), radial-gradient(circle at 23% 36%, rgb(255, 255, 255) 6%, transparent 7%), radial-gradient(circle at 71% 36%, rgb(255, 255, 255) 6%, transparent 7%); border-bottom: 3.5px solid rgb(26, 26, 26); border-radius: 50%; }
+
+/* ═══════ 皮肤系统 ═══════ */
+body.skin-metal { background: linear-gradient(#1a1a2e, #16213e, #0f3460); }
+body.skin-metal .board { background: linear-gradient(175deg, #64748b 0%, #787f8a 30%, #5a626e 60%, #4a5058 100%); border-color: #334155; box-shadow: #1e293b 0 0 0 3px, rgba(0,0,0,.6) 0 8px 40px; }
+body.skin-gem { background: linear-gradient(#0f0720, #1a0a2e, #120522); }
+body.skin-gem .board { background: linear-gradient(175deg, #1e1035 0%, #251545 30%, #180d28 60%, #0f0818 100%); border-color: #4a2080; box-shadow: #2d1250 0 0 0 3px, rgba(80,20,130,.5) 0 8px 40px; }
+body.skin-candy { background: linear-gradient(#2d1520, #3d1f2a, #251018); }
+body.skin-candy .board { background: linear-gradient(175deg, #fcd9e0 0%, #f8b8c8 30%, #f598a8 60%, #e88296 100%); border-color: #d4607a; box-shadow: #9d3d55 0 0 0 3px, rgba(180,60,80,.4) 0 8px 40px; }
+body.skin-pixel { background: #0a0a14; }
+body.skin-pixel .board { background: #1a1a2e; border-color: #334; box-shadow: #0a0a14 0 0 0 3px, rgba(0,0,0,.8) 0 8px 40px; }
+body.skin-nature { background: linear-gradient(#1a2a1a, #1e3018, #142014); }
+body.skin-nature .board { background: linear-gradient(175deg, #c4a87c 0%, #d4b88c 30%, #b89868 60%, #a08050 100%); border-color: #6b5030; box-shadow: #3d2a14 0 0 0 3px, rgba(60,30,10,.5) 0 8px 40px; }
+
+.skin-overlay{position:fixed;inset:0;z-index:110;display:none;align-items:center;justify-content:center;}
+.skin-overlay.show{display:flex;}
+.skin-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);}
+.skin-card{position:relative;background:linear-gradient(#1e293b,#0f172a);border-radius:20px;padding:20px;min-width:300px;max-width:92vw;border:1px solid rgba(255,255,255,.1);box-shadow:0 20px 60px rgba(0,0,0,.6);animation:.3s ease-out cardIn;}
+.skin-title{font-size:18px;font-weight:800;color:#c4b5fd;margin-bottom:14px;text-align:center;}
+.skin-close{position:absolute;top:10px;right:14px;background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;}
+.skin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.skin-item{aspect-ratio:1;border-radius:14px;border:2px solid rgba(255,255,255,.08);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:.2s;background:rgba(255,255,255,.04);}
+.skin-item:active,.skin-item.active{transform:scale(.95);border-color:rgba(168,85,247,.5);background:rgba(168,85,247,.1);}
+.skin-item .si-preview{width:36px;height:36px;border-radius:50%;}
+.skin-item .si-name{font-size:11px;color:#94a3b8;}
+
+.screw.blocked .screw-inner::before { opacity: 0.35; }
+
+.face-happy .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(at 26% 40%, transparent 6%, rgb(26, 26, 26) 7%, transparent 9%), radial-gradient(at 74% 40%, transparent 6%, rgb(26, 26, 26) 7%, transparent 9%); }
+
+.face-cool .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 26% 40%, rgb(26, 26, 26) 15%, transparent 16%), linear-gradient(90deg, transparent 70%, rgb(26, 26, 26) 70%, rgb(26, 26, 26) 78%, transparent 79%); }
+
+.face-silly .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 26% 42%, rgb(26, 26, 26) 15%, transparent 16%), radial-gradient(circle at 74% 42%, rgb(26, 26, 26) 15%, transparent 16%), radial-gradient(circle at 50% 78%, rgb(255, 107, 107) 10%, transparent 11%); }
+
+.face-wow .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 26% 40%, rgb(26, 26, 26) 20%, transparent 21%), radial-gradient(circle at 74% 40%, rgb(26, 26, 26) 20%, transparent 21%), radial-gradient(circle at 23% 35%, rgb(255, 255, 255) 8%, transparent 9%), radial-gradient(circle at 71% 35%, rgb(255, 255, 255) 8%, transparent 9%); border: 3px solid rgb(26, 26, 26); border-radius: 50%; }
+
+.face-shy .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(at 26% 40%, transparent 6%, rgb(26, 26, 26) 7%, transparent 9%), radial-gradient(at 74% 40%, transparent 6%, rgb(26, 26, 26) 7%, transparent 9%); box-shadow: rgba(255, 150, 150, 0.6) 8px 14px 0px -2px, rgba(255, 150, 150, 0.6) -8px 14px 0px -2px; }
+
+.face-chill .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 30% 42%, rgb(26, 26, 26) 10%, transparent 11%), radial-gradient(circle at 70% 42%, rgb(26, 26, 26) 10%, transparent 11%); }
+
+.face-bunny .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 26% 40%, rgb(26, 26, 26) 18%, transparent 19%), radial-gradient(circle at 74% 40%, rgb(26, 26, 26) 18%, transparent 19%); border-bottom: 2px solid rgb(26, 26, 26); }
+
+.face-fire .screw-inner::after { background: radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.5) 30%, transparent 70%), radial-gradient(circle at 26% 40%, rgb(26, 26, 26) 16%, transparent 17%), radial-gradient(circle at 74% 40%, rgb(26, 26, 26) 16%, transparent 17%), radial-gradient(circle at 23% 36%, rgb(255, 255, 255) 7%, transparent 8%), radial-gradient(circle at 71% 36%, rgb(255, 255, 255) 7%, transparent 8%), radial-gradient(circle at 50% 18%, rgb(255, 215, 0) 8%, transparent 9%); }
+
+.hole { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgb(58, 40, 16) 50%, rgb(42, 24, 8) 100%); box-shadow: rgba(0, 0, 0, 0.55) 0px 3px 6px inset, rgba(255, 255, 255, 0.04) 0px 1px 0px; pointer-events: none; z-index: 0; }
+.hole.empty { background: radial-gradient(circle, rgb(28, 18, 8) 40%, rgb(10, 5, 2) 80%, rgb(0, 0, 0) 100%); box-shadow: rgba(0, 0, 0, 0.8) 0px 5px 14px inset, rgba(0, 0, 0, 0.4) 0px 2px 4px; }
+
+.slots-row { display: flex; gap: 10px; justify-content: center; padding: 10px 14px; background: linear-gradient(rgba(70, 55, 35, 0.6), rgba(40, 30, 18, 0.6)); border: 2px solid rgba(180, 150, 120, 0.18); border-radius: 16px; width: var(--w); flex-shrink: 0; min-height: 60px; align-items: center; box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 4px inset; margin-top: -35px; }
+
+.slot { width: 50px; height: 50px; border-radius: 12px; border: 2px dashed rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.25); display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+
+.slot.filled { border-style: solid; border-width: 2.5px; background: rgba(0, 0, 0, 0.12); animation: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) 0s 1 normal none running popIn; }
+
+.slot.match { animation: 0.15s ease-out 0s 1 normal none running matchGlow; }
+
+.slot.clearing { animation: 0.15s ease-in 0s 1 normal forwards running slotClear; }
+
+.slot-dot { width: 32px; height: 32px; border-radius: 50%; box-shadow: rgba(0, 0, 0, 0.3) 0px 2px 4px inset, rgba(0, 0, 0, 0.2) 0px 2px 6px; }
+
+.slots-row.warning { border-color: rgba(255,60,60,.55) !important; animation: slotWarn 0.8s ease-in-out infinite; box-shadow: rgba(255,40,40,.15) 0 0 20px inset; }
+@keyframes slotWarn { 0%,100%{ border-color: rgba(255,60,60,.35); box-shadow: rgba(255,40,40,.08) 0 0 16px inset; } 50%{ border-color: rgba(255,60,60,.9); box-shadow: rgba(255,40,40,.2) 0 0 28px inset; } }
+
+@keyframes popIn { 
+  0% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes matchGlow { 
+  0%, 100% { box-shadow: currentcolor 0px 0px 10px; }
+  50% { box-shadow: currentcolor 0px 0px 35px, currentcolor 0px 0px 55px; }
+}
+
+.board.shake { animation: 0.35s ease-out 0s 1 normal none running boardShake; }
+.board.glow { outline: 3px solid rgba(251,191,36,.6); outline-offset: -2px; transition: outline .3s; }
+
+@keyframes boardShake { 
+  0%, 100% { transform: translateX(0px); }
+  15% { transform: translateX(-3px); }
+  30% { transform: translateX(3px); }
+  45% { transform: translateX(-2px); }
+  60% { transform: translateX(2px); }
+  75% { transform: translateX(-1px); }
+  90% { transform: translateX(1px); }
+}
+
+.info-row { display: flex; justify-content: space-between; width: var(--w); padding: 6px 4px 0px; flex-shrink: 0; }
+
+.info { font-size: 13px; color: rgb(100, 116, 139); }
+
+.info span { color: rgb(148, 163, 184); font-weight: 600; }
+
+#comboCount.active { color:#fbbf24 !important; text-shadow:0 0 8px rgba(251,191,36,.4); transition:color .2s,text-shadow .2s; }
+
+#comboCount.active { color:#fbbf24 !important; text-shadow:0 0 8px rgba(251,191,36,.4); transition:color .2s,text-shadow .2s; }
+
+.overlay { position: fixed; inset: 0px; z-index: 100; display: none; align-items: center; justify-content: center; }
+
+.overlay.show { display: flex; }
+
+.overlay-bg { position: absolute; inset: 0px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); }
+
+.overlay-card { position: relative; background: linear-gradient(rgb(30, 41, 59), rgb(15, 23, 42)); border-radius: 20px; padding: 32px 28px; text-align: center; min-width: 280px; max-width: 90vw; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.6) 0px 20px 60px; animation: 0.3s ease-out 0s 1 normal none running cardIn; }
+
+@keyframes cardIn { 
+  0% { transform: scale(0.85) translateY(10px); opacity: 0; }
+  100% { transform: scale(1) translateY(0px); opacity: 1; }
+}
+
+.overlay-icon { font-size: 52px; margin-bottom: 12px; }
+
+.overlay-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+
+.overlay-sub { font-size: 14px; color: rgb(148, 163, 184); margin-bottom: 20px; line-height: 1.5; }
+
+.overlay-score { font-size: 36px; font-weight: 900; color: rgb(251, 191, 36); margin-bottom: 20px; text-shadow: rgba(251, 191, 36, 0.3) 0px 0px 20px; }
+
+.btn { display: inline-block; padding: 12px 32px; border-radius: 26px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; transition: 0.2s; margin: 5px; min-width: 120px; }
+
+.btn-primary { background: linear-gradient(135deg, rgb(99, 102, 241), rgb(6, 182, 212)); color: rgb(255, 255, 255); box-shadow: rgba(99, 102, 241, 0.35) 0px 4px 20px; }
+
+.btn-primary:active { transform: scale(0.94); }
+
+.btn-secondary { background: rgba(255, 255, 255, 0.06); color: rgb(148, 163, 184); }
+
+.btn-secondary:active { background: rgba(255, 255, 255, 0.12); }
+
+.combo-pop { position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; font-weight: 900; color: rgb(251, 191, 36); pointer-events: none; z-index: 60; will-change: transform, opacity; }
+.combo-pop.show { animation: 0.6s ease-out forwards comboUp; }
+@keyframes comboUp { 
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.4); }
+  50% { opacity: 1; transform: translate(-50%, -80%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -130%) scale(1); }
+}
+.combo-pop.big { font-size: 28px; }
+.combo-pop.huge { font-size: 36px; }
+.combo-pop.grand { font-size: 48px; }
+
+.score-pop { position: absolute; right: 4px; top: -8px; font-size: 16px; font-weight: 900; color: rgb(251, 191, 36); pointer-events: none; z-index: 50; will-change: transform, opacity; }
+
+body.combo-fire::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50; animation: 0.4s ease-out 0s 1 normal forwards running comboFlash; }
+@keyframes comboFlash { 
+  0% { background: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.25) 0%, transparent 70%); }
+  100% { background: transparent; }
+}
+
+@keyframes unlockPulse { 
+  0% { filter: brightness(2); transform: translate(-50%, -50%) scale(1.15); }
+  100% { filter: brightness(1); transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 签到 */
+.checkin-overlay{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;}
+.checkin-overlay.show{display:flex;}
+.checkin-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);}
+.checkin-card{position:relative;background:linear-gradient(#1e293b,#0f172a);border-radius:20px;padding:24px 20px;text-align:center;min-width:300px;max-width:92vw;border:1px solid rgba(255,255,255,.1);box-shadow:0 20px 60px rgba(0,0,0,.6);animation:.3s ease-out cardIn;}
+.checkin-title{font-size:20px;font-weight:800;color:#fbbf24;margin-bottom:4px;}
+.checkin-sub{font-size:12px;color:#94a3b8;margin-bottom:16px;}
+.checkin-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px;}
+.checkin-day{aspect-ratio:1;border-radius:12px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#64748b;border:1px solid rgba(255,255,255,.06);transition:.2s;}
+.checkin-day .cd-icon{font-size:18px;margin-bottom:2px;}
+.checkin-day .cd-label{font-size:10px;}
+.checkin-day.claimed{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.25);color:#4ade80;}
+.checkin-day.today{background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.4);color:#fbbf24;animation:.8s ease-in-out infinite pulse-gold;cursor:pointer;}
+.checkin-day.locked{opacity:.4;}
+@keyframes pulse-gold{0%,100%{box-shadow:0 0 8px rgba(251,191,36,.2)}50%{box-shadow:0 0 16px rgba(251,191,36,.4)}}
+.checkin-btn{display:inline-block;padding:10px 32px;border-radius:24px;border:none;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e1b4b;font-size:15px;font-weight:700;cursor:pointer;}
+.checkin-btn:disabled{background:rgba(255,255,255,.08);color:#64748b;cursor:not-allowed;}
+.checkin-close{position:absolute;top:10px;right:14px;background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;}
+
+/* 分享卡 */
+.share-overlay{position:fixed;inset:0;z-index:110;display:none;align-items:center;justify-content:center;}
+.share-overlay.show{display:flex;}
+.share-bg{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);}
+.share-card-wrap{position:relative;max-width:90vw;max-height:80vh;overflow:auto;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);}
+.share-card-wrap img{display:block;width:100%;border-radius:16px;}
+.share-tip{position:relative;text-align:center;color:#94a3b8;font-size:12px;margin-top:10px;}
+.share-close{position:absolute;top:-14px;right:-14px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:18px;cursor:pointer;z-index:1;}
+
+/* 新手引导 */
+.tut-overlay{position:fixed;inset:0;z-index:1;display:none;align-items:center;justify-content:center;}
+.tut-overlay.show{display:flex;}
+.tut-bg{position:absolute;inset:0;background:rgba(0,0,0,.7);}
+.tut-card{position:relative;background:linear-gradient(#1e293b,#0f172a);border-radius:20px;padding:24px;text-align:center;max-width:300px;border:1px solid rgba(255,255,255,.1);animation:.3s ease-out cardIn;z-index:1;}
+.tut-step{font-size:40px;margin-bottom:8px;}
+.tut-title{font-size:16px;font-weight:700;color:#fbbf24;margin-bottom:6px;}
+.tut-desc{font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:16px;}
+.tut-dots{display:flex;justify-content:center;gap:6px;margin-bottom:16px;}
+.tut-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15);transition:.2s;}
+.tut-dot.active{background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,.4)}
+.tut-btns{display:flex;gap:8px;justify-content:center;}
+.tut-btn{padding:10px 24px;border-radius:20px;border:none;font-size:14px;font-weight:600;cursor:pointer;}
+.tut-btn.primary{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e1b4b;}
+.tut-btn.ghost{background:rgba(255,255,255,.08);color:#94a3b8;}
+
+.props-bar { display: flex; justify-content: center; gap: 8px; width: var(--w); padding: 6px 0px; flex-shrink: 0; }
+.props-bar > div { position: relative; }
+
+.prop-btn { position: relative; width: 50px; height: 50px; border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); color: rgb(148, 163, 184); font-size: 20px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+
+.prop-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.1); }
+
+.prop-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+.prop-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: rgb(251, 191, 36); color: rgb(12, 12, 29); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0px 4px; line-height: 1; }
+
+.prop-badge.zero { background: rgba(255, 255, 255, 0.08); color: rgb(102, 102, 102); }
+
+.prop-label { font-size: 9px; color: rgb(100, 116, 139); text-align: center; margin-top: 2px; }
+
+.coins { font-size: 13px; font-weight: 700; color: rgb(251, 191, 36); display: flex; align-items: center; gap: 3px; text-shadow: rgba(251, 191, 36, 0.2) 0px 0px 8px; }
+
+.shop-grid { display: flex; flex-direction: column; gap: 8px; margin: 6px 0px 12px; }
+
+.shop-item { display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05); }
+
+.shop-icon { font-size: 28px; flex-shrink: 0; width: 40px; text-align: center; }
+
+.shop-info { flex: 1 1 0%; min-width: 0px; }
+
+.shop-name { font-size: 13px; font-weight: 600; }
+
+.shop-desc { font-size: 10px; color: rgb(102, 102, 102); margin-top: 2px; }
+
+.shop-buy { flex-shrink: 0; padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.08); color: rgb(251, 191, 36); font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+
+.shop-buy:active { background: rgba(251, 191, 36, 0.2); transform: scale(0.95); }
+
+.shop-buy:disabled { opacity: 0.35; pointer-events: none; }
+
+.screw.peek-highlight { animation: 0.6s ease-in-out 0s 3 normal none running peekPulse; contain: layout style; }
+
+@keyframes propShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+@keyframes peekPulse { 
+  0%, 100% { box-shadow: var(--peek-color, rgba(251,191,36,0)) 0px 0px 0px 0px; }
+  50% { box-shadow: var(--peek-color, rgba(251,191,36,0.5)) 0px 0px 20px 8px; }
+}
+
+.screw.peek-highlight .screw-inner { border: 2px solid var(--peek-color, #fbbf24); }
+
+.screw.bomb-flash { animation: 0.3s ease-out 0s 1 normal none running bombPop; }
+
+@keyframes bombPop { 
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.3); filter: brightness(2); }
+  100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+}
+
+.undo-btn { position: fixed; bottom: 14px; right: 14px; z-index: 30; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); color: rgb(148, 163, 184); padding: 7px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; transition: 0.2s; backdrop-filter: blur(4px); }
+
+.undo-btn:active { background: rgba(255, 255, 255, 0.15); transform: scale(0.95); }
+
+.score { display: flex; align-items: center; gap: 10px; }
+
+.user-bar { display: flex; justify-content: space-between; align-items: center; width: var(--w); padding: 0px 0px 6px; flex-shrink: 0; }
+
+.user-badge { font-size: 14px; color: rgb(165, 180, 252); display: flex; align-items: center; gap: 4px; }
+
+.user-badge .ub-name { font-weight: 600; }
+
+.user-btn { font-size: 13px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); color: rgb(148, 163, 184); border-radius: 14px; padding: 6px 14px; cursor: pointer; transition: 0.2s; }
+
+.user-btn:hover { background: rgba(255, 255, 255, 0.12); color: rgb(224, 224, 224); }
+
+.user-btn.primary { background: rgba(99, 102, 241, 0.25); border-color: rgba(99, 102, 241, 0.3); color: rgb(199, 210, 254); }
+
+.modal-overlay { position: fixed; inset: 0px; z-index: 100; background: rgba(0, 0, 0, 0.65); display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+
+.modal-overlay.show { display: flex; }
+
+.modal-card { background: linear-gradient(160deg, rgb(30, 30, 58), rgb(22, 22, 46)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 24px 20px; width: min(85vw, 340px); max-height: 80vh; overflow-y: auto; animation: 0.2s ease 0s 1 normal none running modalIn; }
+
+@keyframes modalIn { 
+  0% { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.modal-title { font-size: 17px; font-weight: 700; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+
+.modal-close { width: 28px; height: 28px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.06); color: rgb(170, 170, 170); font-size: 14px; cursor: pointer; line-height: 1; }
+
+.modal-field { margin-bottom: 10px; }
+
+.modal-field label { display: block; font-size: 11px; color: rgb(148, 163, 184); margin-bottom: 4px; }
+
+.modal-field input { width: 100%; padding: 10px 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: rgb(224, 224, 224); font-size: 14px; outline: none; }
+
+.modal-field input:focus { border-color: rgba(99, 102, 241, 0.5); }
+
+.modal-btn { width: 100%; padding: 11px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: 0.2s; }
+
+.modal-btn.primary { background: linear-gradient(135deg, rgb(99, 102, 241), rgb(139, 92, 246)); color: rgb(255, 255, 255); }
+
+.modal-btn.primary:active { transform: scale(0.97); }
+
+.modal-tabs { display: flex; gap: 0px; margin-bottom: 16px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.08); }
+
+.modal-tab { flex: 1 1 0%; padding: 8px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; border: none; color: rgb(102, 102, 102); transition: 0.2s; }
+
+.modal-tab.active { background: rgba(99, 102, 241, 0.2); color: rgb(199, 210, 254); }
+
+.modal-error { font-size: 11px; color: rgb(248, 113, 113); margin-bottom: 8px; display: none; }
+
+.lb-list { max-height: 50vh; overflow-y: auto; margin-top: 6px; }
+
+.lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 2px; font-size: 13px; transition: 0.2s; }
+
+.lb-row:nth-child(2n+1) { background: rgba(255, 255, 255, 0.03); }
+
+.lb-row.me { background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.2); }
+
+.lb-rank { width: 28px; text-align: center; font-weight: 800; font-size: 14px; }
+
+.lb-rank.r1 { color: rgb(251, 191, 36); }
+
+.lb-rank.r2 { color: rgb(148, 163, 184); }
+
+.lb-rank.r3 { color: rgb(217, 119, 6); }
+
+.lb-name { flex: 1 1 0%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.lb-score { font-weight: 700; color: rgb(251, 191, 36); font-size: 14px; }
+
+.lb-games { font-size: 10px; color: rgb(102, 102, 102); min-width: 30px; text-align: right; }
+
+.lb-period { display: flex; gap: 4px; margin-bottom: 12px; }
+
+.lb-period button { font-size: 10px; padding: 4px 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); background: transparent; color: rgb(136, 136, 136); cursor: pointer; transition: 0.2s; }
+
+.lb-period button.active { background: rgba(99, 102, 241, 0.2); color: rgb(199, 210, 254); border-color: rgba(99, 102, 241, 0.3); }
+
+.lb-empty { text-align: center; color: rgb(102, 102, 102); padding: 30px 0px; font-size: 13px; }
+
+</style>
+
+</head>
+<body>
+
+<div class="back-nav" id="backNav">
+  <a href="/nav" class="bn-link">🏠 导航</a>
+  <span class="bn-divider"></span>
+  <button class="bn-close" id="bnClose">×</button>
+</div>
+
+<div class="user-bar" id="userBar">
+  <div class="user-badge">👤 <span class="ub-name" id="ubName">游客</span></div>
+  <div style="display:flex;gap:6px">
+    <button class="user-btn" id="btnLeaderboard" onclick="showLeaderboard()">🏆 排行</button>
+    <button class="user-btn" id="btnLogin" onclick="showLogin()">登录</button>
+  </div>
+</div>
+
+<div class="top-bar">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div class="level-badge" id="levelBadge" onclick="toggleLevelPicker()">第 1 关 ▼</div>
+  </div>
+  <div class="score">⭐ <span id="scoreVal">0</span> <span class="coins">🪙 <span id="coinVal">0</span></span><div id="scorePop" class="score-pop" style="display:none"></div></div>
+  <button class="sound-btn" id="checkinBarBtn" onclick="if(!authState.token)showLogin();else showCheckin()" title="每日签到" style="font-size:13px;width:28px;height:28px;background:rgba(251,191,36,.15);color:#fbbf24">📅</button>
+  <button class="sound-btn" id="soundBtn" onclick="toggleThemePanel()" title="音效设置" style="font-size:14px;background:rgba(251,191,36,.25);color:#fde68a;border:1px solid rgba(251,191,36,.35);box-shadow:0 0 12px rgba(251,191,36,.2)">🎶</button>
+  <button class="sound-btn" id="skinBtn" onclick="showSkinPicker()" title="皮肤" style="font-size:14px;background:rgba(168,85,247,.15);color:#c4b5fd">🎨</button>
+</div>
+
+<div class="theme-picker" id="themePicker">
+  <div class="theme-picker-title">音效设置</div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
+    <button id="volDown" style="width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:#94a3b8;font-size:16px;cursor:pointer;line-height:1">−</button>
+    <span id="volLabel" style="font-size:16px;font-weight:700;color:#c7d2fe;min-width:32px;text-align:center">70</span>
+    <button id="volUp" style="width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:#94a3b8;font-size:16px;cursor:pointer;line-height:1">+</button>
+  </div>
+</div>
+
+<div class="level-picker" id="levelPicker">
+  <div class="level-picker-title">🎯 选择关卡</div>
+  <div class="level-picker-list" id="levelPickerList"></div>
+</div>
+
+<div class="pause-bar">
+  <button class="sound-btn" id="themeBtn" onclick="toggleSound()" title="静音开关" style="font-size:14px;width:36px;height:36px">🔊</button>
+  <button class="pause-btn" id="modeBtn" onclick="toggleMode()" title="模式切换" style="font-size:13px;padding:2px 10px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(99,102,241,.15);color:#c7d2fe;cursor:pointer">😊 普通</button>
+  <button class="pause-btn" id="pauseBtn" onclick="togglePause()" title="暂停">⏸</button>
+</div>
+
+<div class="board-wrap">
+  <div class="board" id="board">
+    <div class="board-cleared" id="boardCleared">
+      <div class="bc-text">第 <span id="bcLevel">1</span> 关</div>
+      <button class="btn btn-primary bc-btn" onclick="nextLevel()">▶ 继续</button>
+    </div>
+    <div class="pause-overlay" id="pauseOverlay">
+      <div class="pause-icon">⏸</div>
+      <div class="pause-title">已暂停</div>
+      <button class="btn btn-primary" onclick="resumeGame()" style="width:auto;padding:10px 36px">▶ 继续游戏</button>
+      <button class="btn btn-secondary" onclick="clearPauseState();restartLevel()" style="width:auto;padding:10px 36px">🔄 重新开始</button>
+    </div>
+  </div>
+</div>
+
+<div class="slots-row" id="slotsRow"></div>
+
+<div class="props-bar">
+  <div style="text-align:center">
+    <button class="prop-btn" id="propUndo" onclick="useProp('undo')" title="撤回一步">↩️</button>
+    <div class="prop-badge" id="badgeUndo">5</div>
+    <div class="prop-label">撤回</div>
+  </div>
+  <div style="text-align:center">
+    <button class="prop-btn" id="propBomb" onclick="useProp('bomb')" title="消除糖果">💣</button>
+    <div class="prop-badge" id="badgeBomb">3</div>
+    <div class="prop-label">炸弹</div>
+  </div>
+  <div style="text-align:center">
+    <button class="prop-btn" id="propPeek" onclick="useProp('peek')" title="高亮可点糖果">👁️</button>
+    <div class="prop-badge" id="badgePeek">3</div>
+    <div class="prop-label">透视</div>
+  </div>
+  <div style="text-align:center">
+    <button class="prop-btn" id="propLightning" onclick="useProp('lightning')" title="消除槽内最多颜色">⚡</button>
+    <div class="prop-badge" id="badgeLightning">3</div>
+    <div class="prop-label">闪电</div>
+  </div>
+  <div style="text-align:center">
+    <button class="prop-btn" id="propShuffle" onclick="useProp('shuffle')" title="随机重排颜色">🔀</button>
+    <div class="prop-badge" id="badgeShuffle">3</div>
+    <div class="prop-label">洗牌</div>
+  </div>
+  <div style="text-align:center">
+    <button class="prop-btn" id="propShop" onclick="showShop()" title="道具商店">🛒</button>
+    <div class="prop-label">商店</div>
+  </div>
+</div>
+
+<div class="info-row">
+  <div class="info">剩余 <span id="remainCount">0</span>/<span id="totalCount">0</span></div>
+  <div class="info">连击 <span id="comboCount">×0</span></div>
+</div>
+
+
+
+<div class="overlay" id="overlayWin">
+  <div class="overlay-bg"></div>
+  <div class="overlay-card">
+    <div class="overlay-icon">🎉</div>
+    <div class="overlay-title" id="winTitle">过关！</div>
+    <div class="overlay-stars" id="winStars" style="font-size:32px;margin:4px 0">⭐⭐⭐</div>
+    <div id="winStarInfo" style="font-size:10px;color:#64748b;margin:-2px 0 6px">⭐⭐⭐≥85% &nbsp;⭐⭐≥70% &nbsp;|&nbsp;连击拉高得分倍率</div>
+    <div class="overlay-sub" id="winSub"></div>
+    <div class="overlay-score" id="winScore">0</div>
+    <button class="btn btn-primary" id="btnNext">▶ 下一关</button>
+    <button class="btn btn-secondary" id="btnReplay">🔄 重玩</button>
+    <div style="display:flex;gap:8px;width:100%">
+      <button class="btn btn-secondary" style="flex:1;white-space:nowrap" onclick="showLeaderboard()">🏆 排行榜</button>
+      <button class="btn btn-secondary" style="flex:1;white-space:nowrap" onclick="generateShareCard()">📤 分享</button>
+    </div>
+    <button class="btn btn-secondary" onclick="$('overlayWin').classList.remove('show');$('bcLevel').textContent=level;$('boardCleared').classList.add('show')">🏠 返回</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlayLose">
+  <div class="overlay-bg"></div>
+  <div class="overlay-card">
+    <div class="overlay-icon">😵</div>
+    <div class="overlay-title">卡住了！</div>
+    <div class="overlay-sub">收集栏已满，换个顺序试试</div>
+    <div class="overlay-pct" id="losePct" style="font-size:24px;color:#94a3b8;margin-top:-8px">0%</div>
+    <div class="overlay-score" id="loseScore">0</div>
+    <button class="btn btn-primary" id="btnContinue" onclick="restartLevel()" style="font-size:18px;padding:14px 28px">▶️ 继续冲</button>
+    <button class="btn btn-accent" id="btnSimulate" onclick="startSimulate()" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">🤖 模拟演示</button>
+    <button class="btn btn-secondary" onclick="useProp('undo');$('overlayLose').classList.remove('show')">↩️ 撤回一步</button>
+    <button class="btn btn-secondary" id="btnLoseBomb" onclick="$('overlayLose').classList.remove('show');useProp('bomb')">💣 炸弹清空 (<span id="loseBombCount">3</span>)</button>
+    <button class="btn btn-secondary" id="btnRetry" style="font-size:13px;opacity:0.7">🔄 重来</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="loginOverlay">
+  <div class="modal-card">
+    <div class="modal-title">
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="login" onclick="switchTab('login')">登录</button>
+        <button class="modal-tab" data-tab="register" onclick="switchTab('register')">注册</button>
+      </div>
+      <button class="modal-close" onclick="hideLogin()">×</button>
+    </div>
+    <div class="modal-error" id="loginError"></div>
+    <div id="loginFields">
+      <div class="modal-field"><label>手机号</label><input type="tel" id="phone" placeholder="11位手机号" maxlength="11"></div>
+      <div class="modal-field"><label>密码</label><input type="password" id="password" placeholder="至少6位"></div>
+      <div class="modal-field" id="nicknameField" style="display:none"><label>昵称</label><input type="text" id="nickname" placeholder="2-8个字符" maxlength="8"></div>
+      <button class="modal-btn primary" id="btnSubmitAuth">登录</button>
+      <div style="text-align:center;margin-top:8px;font-size:11px;color:#666">不登录也能玩 · 游客不计排行榜</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="lbOverlay">
+  <div class="modal-card">
+    <div class="modal-title">🏆 排行榜<button class="modal-close" onclick="hideLeaderboard()">×</button></div>
+    <div class="lb-period" id="lbPeriod">
+      <button class="active" data-p="all" onclick="switchPeriod('all')">总榜</button>
+      <button data-p="today" onclick="switchPeriod('today')">今日</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px">
+      <span style="font-size:11px;color:#64748b">关卡</span>
+      <select id="lbLevel" onchange="loadLeaderboard()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;border-radius:8px;padding:4px 8px;font-size:12px">
+        <option value="">全部</option>
+      </select>
+    </div>
+    <div class="lb-list" id="lbList"><div class="lb-empty">加载中...</div></div>
+    <div style="text-align:center;margin-top:8px;font-size:10px;color:#555" id="lbStats"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="shopOverlay">
+  <div class="modal-card">
+    <div class="modal-title">🛒 道具商店<button class="modal-close" onclick="hideShop()">×</button></div>
+    <div style="text-align:center;margin-bottom:12px;font-size:13px;color:#fbbf24">🪙 <span id="shopCoinVal">0</span></div>
+    <div class="shop-grid" id="shopGrid"></div>
+  </div>
+</div>
+
+<div class="checkin-overlay" id="checkinOverlay">
+  <div class="checkin-bg" onclick="hideCheckin()"></div>
+  <div class="checkin-card">
+    <button class="checkin-close" onclick="hideCheckin()">×</button>
+    <div class="checkin-title">📅 每日签到</div>
+    <div class="checkin-sub">连续签到7天得大礼</div>
+    <div class="checkin-grid" id="checkinGrid"></div>
+    <button class="checkin-btn" id="checkinBtn" onclick="doCheckin()">🎁 签到领奖</button>
+  </div>
+</div>
+
+<div class="share-overlay" id="shareOverlay">
+  <div class="share-bg" onclick="hideShare()"></div>
+  <div>
+    <div class="share-card-wrap">
+      <button class="share-close" onclick="hideShare()">×</button>
+      <img id="shareImg" src="" alt="战绩分享卡">
+    </div>
+    <div class="share-tip">📱 长按图片保存分享</div>
+  </div>
+</div>
+
+<div class="tut-overlay" id="tutOverlay">
+  <div class="tut-bg"></div>
+  <div class="tut-card">
+    <div class="tut-step" id="tutIcon">🍬</div>
+    <div class="tut-title" id="tutTitle"></div>
+    <div class="tut-desc" id="tutDesc"></div>
+    <div class="tut-dots" id="tutDots"></div>
+    <div class="tut-btns">
+      <button class="tut-btn ghost" onclick="skipTutorial()">跳过</button>
+      <button class="tut-btn primary" id="tutNextBtn" onclick="nextTutorial()">下一步</button>
+    </div>
+  </div>
+</div>
+
+<div class="skin-overlay" id="skinOverlay">
+  <div class="skin-bg" onclick="hideSkinPicker()"></div>
+  <div class="skin-card">
+    <button class="skin-close" onclick="hideSkinPicker()">×</button>
+    <div class="skin-title">🎨 选择皮肤</div>
+    <div class="skin-grid" id="skinGrid"></div>
+  </div>
+</div>
+
+<script>
+// ═══════ 导航拖拽 ═══════
+(function(){
+var n=document.getElementById('backNav'),c=document.getElementById('bnClose'),d=!1,ox=0,oy=0;
+c.onclick=function(e){e.stopPropagation();n.style.display='none'};
+n.addEventListener('pointerdown',function(e){if(e.target===c)return;d=!0;n.classList.add('dragging');var r=n.getBoundingClientRect();ox=e.clientX-r.left;oy=e.clientY-r.top;n.setPointerCapture(e.pointerId)});
+n.addEventListener('pointermove',function(e){if(!d)return;n.style.left=(e.clientX-ox)+'px';n.style.top=(e.clientY-oy)+'px';n.style.transform='none'});
+n.addEventListener('pointerup',function(){d=!1;n.classList.remove('dragging')});
+})();
+
+// ═══════ 防缩放 ═══════
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('gesturechange',e=>e.preventDefault());
+document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+
+// ═══════ 音效 ═══════
+let soundOn=!0;
+try{var audioCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){audioCtx=null}
+var masterGain=audioCtx?audioCtx.createGain():null;
+if(masterGain){masterGain.connect(audioCtx.destination);var savedVol=parseFloat(localStorage.getItem('sfx_volume'));masterGain.gain.value=isNaN(savedVol)?0.7:savedVol}
+let soundTheme=localStorage.getItem('sfx_theme')||'classic';
+// p=音高倍率(>1尖锐<1低沉), w=波形映射{sine:?,triangle:?,sawtooth:?}
+const SFX_T={
+  classic:{p:1,  w:{sine:'sine',triangle:'triangle',sawtooth:'sawtooth'}},       // 标准
+  cute:   {p:1.55,w:{sine:'sine',triangle:'triangle',sawtooth:'sawtooth'}},       // 可爱
+  chip:   {p:2.0, w:{sine:'sawtooth',triangle:'sawtooth',sawtooth:'sawtooth'}},   // 8-bit
+  warm:   {p:.7,  w:{sine:'sine',triangle:'triangle',sawtooth:'sine'}},           // 温暖
+  dream:  {p:2.2, w:{sine:'triangle',triangle:'triangle',sawtooth:'triangle'}},   // 梦幻
+  tiny:   {p:3.5, w:{sine:'sine',triangle:'sine',sawtooth:'sine'}},               // 八音盒
+  sparkle:{p:1.8, w:{sine:'sine',triangle:'sine',sawtooth:'triangle'}},           // 闪亮
+  jazz:   {p:.9,  w:{sine:'sine',triangle:'triangle',sawtooth:'triangle'}}        // 爵士
+};
+const SFX_LABELS={classic:'标准',cute:'可爱',chip:'8-bit',warm:'温暖',dream:'梦幻',tiny:'八音盒',sparkle:'闪亮',jazz:'爵士'};
+if(localStorage.getItem('sfx_theme')&&SFX_T[localStorage.getItem('sfx_theme')])soundTheme=localStorage.getItem('sfx_theme');
+function tw(t){var o=SFX_T[soundTheme];return{type:o.w[t]||t,p:o.p}}
+function playTone(f,d,t,v){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+d);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d)}
+function sfxClick(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('sine'),t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.setValueAtTime(800*tp.p,t);o.frequency.exponentialRampToValueAtTime(1200*tp.p,t+.06);g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.08);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t);o.stop(t+.08)}
+function sfxCollect(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('triangle'),t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.setValueAtTime(500*tp.p,t);o.frequency.exponentialRampToValueAtTime(260*tp.p,t+.15);g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t);o.stop(t+.18)}
+function sfxMatch(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('sine'),t=audioCtx.currentTime;[523,659,784].forEach(function(f,i){var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.value=f*tp.p;g.gain.setValueAtTime(.08,t+i*.07);g.gain.exponentialRampToValueAtTime(.001,t+i*.07+.15);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t+i*.07);o.stop(t+i*.07+.15)})}
+function sfxWin(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('triangle'),t=audioCtx.currentTime,notes=[523,659,784,1047];notes.forEach(function(f,i){var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.value=f*tp.p;g.gain.setValueAtTime(.1,t+i*.1);g.gain.exponentialRampToValueAtTime(.001,t+i*.1+.3);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t+i*.1);o.stop(t+i*.1+.3)})}
+function sfxLose(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('sawtooth'),t=audioCtx.currentTime;[300,250,200].forEach(function(f,i){var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.value=f*tp.p;g.gain.setValueAtTime(.04,t+i*.15);g.gain.exponentialRampToValueAtTime(.001,t+i*.15+.2);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t+i*.15);o.stop(t+i*.15+.2)})}
+function sfxBomb(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('sawtooth'),t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.setValueAtTime(200*tp.p,t);o.frequency.exponentialRampToValueAtTime(50*tp.p,t+.3);g.gain.setValueAtTime(.15,t);g.gain.exponentialRampToValueAtTime(.001,t+.35);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t);o.stop(t+.35)}
+function sfxUndo(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('sine'),t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.setValueAtTime(200*tp.p,t);o.frequency.exponentialRampToValueAtTime(600*tp.p,t+.2);g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t);o.stop(t+.22)}
+function sfxPeek(){if(!soundOn||!audioCtx)return;if(audioCtx.state==='suspended')audioCtx.resume();var tp=tw('sine'),t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=tp.type;o.frequency.setValueAtTime(400*tp.p,t);o.frequency.exponentialRampToValueAtTime(1600*tp.p,t+.25);g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);o.connect(g);g.connect(masterGain||audioCtx.destination);o.start(t);o.stop(t+.3)}
+function sfxShop(){playTone(440,.08,'sine',.06);setTimeout(function(){playTone(660,.08,'sine',.06)},80)}
+function sfxBuy(){playTone(523,.12,'sine',.08);setTimeout(function(){playTone(659,.12,'sine',.08);setTimeout(function(){playTone(784,.2,'sine',.1)},100)},100)}
+function toggleSound(){soundOn=!soundOn;var b=document.getElementById('themeBtn');if(soundOn){b.textContent='🔊';b.classList.remove('muted');if(masterGain){var sv=parseFloat(localStorage.getItem('sfx_volume'));masterGain.gain.value=isNaN(sv)||sv===0?0.7:sv}}else{b.textContent='🔇';b.classList.add('muted');if(masterGain)masterGain.gain.value=0}if(soundOn&&audioCtx&&audioCtx.state==='suspended')audioCtx.resume()}
+function selectTheme(name){soundTheme=name;localStorage.setItem('sfx_theme',name);document.getElementById('themePicker').classList.remove('show');sfxClick()}
+function toggleThemePanel(){var p=document.getElementById('themePicker'),b=document.getElementById('soundBtn'),r=b.getBoundingClientRect();p.style.top=(r.bottom+4)+'px';p.style.right=(window.innerWidth-r.right)+'px';p.classList.toggle('show')}
+
+// ═══════ 皮肤系统 ═══════
+const SKINS=[
+  {id:'default',name:'星空',icon:'🪐',preview:'radial-gradient(circle at 35% 35%, #6366f1, #312e81)'},
+  {id:'metal',name:'金属',icon:'⚙️',preview:'linear-gradient(135deg, #e2e8f0 10%, #475569 100%)'},
+  {id:'gem',name:'宝石',icon:'💎',preview:'radial-gradient(circle at 30% 30%, #e9d5ff, #7c3aed, #4c1d95)'},
+  {id:'candy',name:'糖果',icon:'🍬',preview:'radial-gradient(circle at 35% 35%, #fef3c7, #ea580c)'},
+  {id:'pixel',name:'像素',icon:'👾',preview:'#6366f1'},
+  {id:'nature',name:'自然',icon:'🌿',preview:'radial-gradient(circle at 35% 35%, #d4c4a8, #5a4420)'},
+];
+function getSkin(){return localStorage.getItem('game_skin')||'default'}
+function applySkin(id){
+  document.body.classList.forEach(function(c){if(c.startsWith('skin-'))document.body.classList.remove(c)});
+  if(id!=='default')document.body.classList.add('skin-'+id);
+  localStorage.setItem('game_skin',id);
+}
+function showSkinPicker(){
+  var cur=getSkin(),html='';
+  SKINS.forEach(function(s){
+    html+='<div class="skin-item'+(s.id===cur?' active':'')+'" onclick="applySkin(\''+s.id+'\');hideSkinPicker()"><div class="si-preview" style="background:'+s.preview+'"></div><div class="si-name">'+s.icon+' '+s.name+'</div></div>';
+  });
+  document.getElementById('skinGrid').innerHTML=html;
+  document.getElementById('skinOverlay').classList.add('show');
+}
+function hideSkinPicker(){document.getElementById('skinOverlay').classList.remove('show')}
+
+// ═══════ 游戏数据 ═══════
+const COLORS=[{name:'白',hex:'#e8e8e0',light:'#ffffff',face:'bunny',pattern:'crosshatch'},{name:'紫',hex:'#af52de',light:'#d4a0f0',face:'shy',pattern:'diagonal'},{name:'红',hex:'#ff3b30',light:'#ff8a80',face:'happy',pattern:'dots'},{name:'蓝',hex:'#007aff',light:'#6cb6ff',face:'cool',pattern:'vstripes'},{name:'橙',hex:'#ff9500',light:'#ffc04d',face:'wow',pattern:'concentric'},{name:'绿',hex:'#34c759',light:'#84d89a',face:'silly',pattern:'checker'},{name:'黄',hex:'#ffcc00',light:'#ffe566',face:'chill',pattern:'hstripes'},{name:'粉',hex:'#ff6b35',light:'#ffb088',face:'fire',pattern:'waves'}];
+const MAX_SLOTS=5,MATCH_COUNT=3;
+let screws=[],slots=[],score=0,level=1,combo=0,history=[],processing=!1,lastClick=0;
+let comboTimer=null,levelEntryScore=0,totalScrewCount=0,starMoves=0,isDailyChallenge=!1,gameMode=0;
+const COMBO_TIMEOUT=1500;
+let props={undo:5,bomb:3,peek:3,lightning:3,shuffle:3},coins=30,paused=!1;
+const $=id=>document.getElementById(id);
+
+// ═══════ 收集槽 ═══════
+function buildSlots(){var r=$('slotsRow');r.innerHTML='';for(var i=0;i<MAX_SLOTS;i++){var d=document.createElement('div');d.className='slot';d.id='slot'+i;r.appendChild(d)}}
+function updateSlotsUI(){for(var i=0;i<MAX_SLOTS;i++){var el=$('slot'+i),s=slots[i];if(s){el.classList.remove('match','clearing');el.classList.add('filled');el.style.borderColor=s.color.hex;el.className=el.className.replace(/face-\w+/g,'');el.classList.add('face-'+s.color.face);var inner=el.querySelector('.screw-inner');if(!inner){inner=document.createElement('div');inner.className='screw-inner';inner.style.width='100%';inner.style.height='100%';el.appendChild(inner)}inner.style.background='radial-gradient(circle at 35% 35%,'+s.color.light+','+s.color.hex+' 50%,'+shadeColor(s.color.hex,-30)+')';inner.className='screw-inner';if(s.color.pattern)inner.classList.add('pat-'+s.color.pattern)}else{el.classList.remove('filled','match','clearing');el.className=el.className.replace(/face-\w+/g,'');el.style.borderColor='';el.innerHTML=''}}$('slotsRow').classList.toggle('warning',slots.filter(Boolean).length>=MAX_SLOTS-1)}
+function flashSlots(indices){indices.forEach(function(i){var el=$('slot'+i);if(el){el.classList.add('match');el.style.color=slots[i]?slots[i].color.hex:'#fff';setTimeout(function(){el.classList.remove('match')},150)}})}
+function clearSlots(indices){indices.forEach(function(i){var el=$('slot'+i);if(el)el.classList.add('clearing')});setTimeout(function(){indices.sort(function(a,b){return b-a}).forEach(function(i){slots.splice(i,1)});slots=slots.filter(Boolean);updateSlotsUI();processing=!1},100)}
+
+// ═══════ 螺丝交互 ═══════
+function onScrewClick(e){if(paused)return;var id=parseInt(this.getAttribute('data-id')),s=screws.find(function(x){return x.id===id});if(!s||s.blocked||s.removed||s.removing)return;processClick(s)}
+function processClick(screw){if(processing)return;sfxClick();
+  history.push({screw:screw,slots:slots.map(function(s){return s?{id:s.id,color:s.color}:null}),score:score,combo:combo});
+  screw.removing=!0;var el=board.querySelector('.screw[data-id="'+screw.id+'"]');if(el){el.classList.add('removing')}
+  screw.removed=!0;screw.removing=!1;starMoves++;setTimeout(function(){el&&el.remove()},150);slots.push({id:screw.id,color:screw.color});updateBlocked(screw.id);checkMatches();sfxCollect();
+  requestAnimationFrame(function(){updateSlotsUI();addHole(screw);if(screws.every(function(s){return s.removed})){setTimeout(winLevel,400)}else{updateRemain()};autoSave()})}
+
+// ═══════ 粒子爆发 ═══════
+function spawnParticles(cx,cy,hex){
+  var board=$('board'),count=8;
+  for(var i=0;i<count;i++){
+    var p=document.createElement('div');
+    p.className='match-particle';
+    var angle=(i/count)*Math.PI*2,r=30+Math.random()*40;
+    p.style.cssText='left:'+cx+'%;top:'+cy+'%;width:8px;height:8px;background:'+hex+';--px:'+(Math.cos(angle)*r)+'px;--py:'+(Math.sin(angle)*r)+'px';
+    board.appendChild(p);
+    setTimeout(function(){p.remove()},500);
+  }
+}
+
+function checkMatches(){
+  var count={};slots.forEach(function(s,i){if(!s)return;var k=s.color.name;if(!count[k])count[k]=[];count[k].push(i)});
+  var matchIndices=null;
+  for(var cn in count){if(count[cn].length>=MATCH_COUNT){matchIndices=count[cn].slice(0,MATCH_COUNT);break}}
+  if(matchIndices){processing=!0;flashSlots(matchIndices);sfxMatch();spawnParticles(50,90,slots[matchIndices[0]].color.hex);if(comboTimer)clearTimeout(comboTimer);combo++;
+    var bonus=combo>1?combo*5:0;score+=30+bonus;$('scoreVal').textContent=score;$('comboCount').textContent='×'+combo;$('comboCount').classList.add('active');showScore(30+bonus);
+    if(combo>=5){showCombo('🔥 '+combo+'连击！',combo);$('board').classList.add('shake');setTimeout(function(){$('board').classList.remove('shake')},350)}
+    else if(combo>=3){showCombo('⚡ '+combo+'连击！',combo);$('board').classList.add('glow');setTimeout(function(){$('board').classList.remove('glow')},600)}
+    if(combo>=5)document.body.classList.add('combo-fire');
+    comboTimer=setTimeout(function(){combo=0;$('comboCount').textContent='×0';$('comboCount').classList.remove('active');document.body.classList.remove('combo-fire')},COMBO_TIMEOUT);
+    setTimeout(function(){clearSlots(matchIndices);setTimeout(function(){updateRemain()},100)},100)}
+  else{
+    if(slots.length>=MAX_SLOTS){processing=!0;$('board').classList.add('shake');sfxLose();if(!gameMode){gameMode=1;updateModeUI();saveMode()}var remain=screws.filter(function(s){return!s.removed}).length;var pct=Math.round((totalScrewCount-remain)/totalScrewCount*100);setTimeout(function(){$('loseScore').textContent=score;$('losePct').textContent=pct+'%';$('overlayLose').classList.add('show');$('btnContinue').focus();processing=!1},400)}
+    else{processing=!1}updateRemain()}
+}
+
+function showCombo(text,c){var el=$('comboPop');el.textContent=text;el.className='combo-pop';if(c>=21)el.classList.add('grand');else if(c>=16)el.classList.add('huge');else if(c>=11)el.classList.add('big');el.style.display='';el.getAnimations().forEach(function(a){a.cancel()});if(el.animate){el.animate([{opacity:1,transform:'translate(-50%,-50%) scale(0.4)'},{opacity:1,transform:'translate(-50%,-80%) scale(1.2)',offset:.5},{opacity:0,transform:'translate(-50%,-130%) scale(1)'}],{duration:600,easing:'ease-out',fill:'forwards'}).onfinish=function(){el.style.display='none'}}else{el.classList.add('show');setTimeout(function(){el.style.display='none';el.classList.remove('show')},600)}}
+function showScore(n){var el=$('scorePop');el.textContent='+'+n;el.style.display='';el.getAnimations().forEach(function(a){a.cancel()});el.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-28px)'}],{duration:700,easing:'ease-out',fill:'forwards'}).onfinish=function(){el.style.display='none'}}
+
+// ═══════ 关卡生成 — 多层随机散落 ═══════
+
+// ═══════ 种子随机数（每日挑战用） ═══════
+function seedRandom(seed){
+  var a=seed;
+  return function(){
+    var t=a+=0x6D2B79F5;
+    t=Math.imul(t^t>>>15,t|1);
+    t^=t+Math.imul(t^t>>>7,t|61);
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function getDailySeed(){
+  var d=new Date();
+  return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+}
+function isDailyMode(){return location.search.indexOf('daily')>=0}
+
+function generateLevel(){
+  screws=[];slots=[];history=[];combo=0;processing=!1;starMoves=0;if(comboTimer){clearTimeout(comboTimer);comboTimer=null};isDailyChallenge=isDailyMode();var _origRandom=Math.random;if(isDailyChallenge){var _seeded=seedRandom(getDailySeed());Math.random=function(){return _seeded()}}
+  var boardEl=$('board'),existing=boardEl.querySelectorAll('.screw,.hole');existing.forEach(function(el){el.remove()});
+  var numColors=5+(level%4)+(gameMode?2:0),screwsPerColor=Math.round(3*level*(gameMode?1.5:1));
+  var total=numColors*screwsPerColor,levelColors=COLORS.slice(0,numColors),screwList=[];
+  for(var c=0;c<numColors;c++){for(var i=0;i<screwsPerColor;i++){screwList.push({color:levelColors[c]})}}
+  for(var i=screwList.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var tmp=screwList[i];screwList[i]=screwList[j];screwList[j]=tmp}
+
+  // 羊了个羊式分布：钟形曲线多层，中间层最多，顶层底层稀少，中心聚集
+  var numLayers=Math.max(3,Math.floor(total/7));
+  var mid=(numLayers-1)/2,sigma=numLayers/3,totalWeight=0,weights=[];
+  for(var li=0;li<numLayers;li++){
+    var w=Math.exp(-Math.pow((li-mid)/sigma,2));
+    weights.push(w);totalWeight+=w;
+  }
+  var idx=0;
+  for(var li=0;li<numLayers&&idx<total;li++){
+    var count=li===numLayers-1?total-idx:Math.round(total*weights[li]/totalWeight);
+    var used={};
+    for(var b=0;b<count&&idx<total;b++){
+      var spread=92,grid=5,x,y,attempts=0;  // 全关卡统一散布
+      do{
+        var edge=(100-spread)/2;
+        x=edge+Math.random()*spread;y=edge+Math.random()*spread;
+        var key=Math.round(x/grid)+'_'+Math.round(y/grid);
+        attempts++;
+      }while(used[key]&&attempts<30);
+      used[key]=1;
+      screws.push({id:idx,x:x,y:y,size:Math.max(10,22-Math.floor(level/3)*2-(gameMode?4:0)),layer:li,color:screwList[idx].color,removed:!1,blocked:!1,removing:!1});
+      idx++;
+    }
+  }
+  // Sort by layer for correct drawing order (layer 0 = top)
+  screws.sort(function(a,b){return b.layer-a.layer});
+  // Re-assign ids after sort
+  screws.forEach(function(s,i){s.id=i});
+
+  updateBlocked();
+  // 确保每种颜色至少一个可点球（3匹配可行）
+  for(var _rr=0;_rr<15;_rr++){
+    var bad=levelColors.filter(function(lc){return !screws.some(function(s){return !s.removed&&!s.blocked&&s.color.name===lc.name})});
+    if(bad.length===0)break;
+    bad.forEach(function(bc){
+      var blocked=screws.filter(function(s){return !s.removed&&s.blocked&&s.color.name===bc.name});
+      blocked.forEach(function(s){s.blocked=!1});
+    });
+    updateBlocked();
+  }
+  // 可解性验证：不可解则重新生成（每日挑战模式跳过，保留原始难度）
+  var retries=0,maxRetries=isDailyChallenge?0:10,solvable=false;
+  while(retries<maxRetries){
+    solvable=isSolvable();
+    if(solvable)break;
+    retries++;
+    // 重新洗牌颜色分布
+    for(var i=screwList.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var tmp=screwList[i];screwList[i]=screwList[j];screwList[j]=tmp}
+    // 重新分配螺丝颜色
+    var idx2=0;
+    for(var li2=0;li2<numLayers&&idx2<total;li2++){
+      var count2=li2===numLayers-1?total-idx2:Math.round(total*weights[li2]/totalWeight);
+      for(var b2=0;b2<count2&&idx2<total;b2++){
+        if(idx2<total){screws[idx2].color=screwList[idx2].color;idx2++}
+      }
+    }
+    updateBlocked();
+  }
+  if(!solvable&&maxRetries>0){console.warn('Level '+level+' unsolvable after '+maxRetries+' retries, using last attempt')}
+
+  totalScrewCount=total;$('totalCount').textContent=total;levelEntryScore=score;renderAll();updateSlotsUI();updateRemain();
+  $('levelBadge').textContent='第 '+level+' 关'+(isDailyChallenge?' 🔥 每日 ▼':(gameMode?' 👿 ▼':' ▼'));$('comboCount').textContent='×0';$('scoreVal').textContent=score;
+}
+
+// ═══════ 遮罩算法：上层球中心覆盖下层球中心→遮挡；重叠>80%面积→blocked═══════
+function circleOverlap(r1,r2,d){
+  if(d>=r1+r2)return 0;
+  if(d<=Math.abs(r1-r2))return Math.PI*Math.min(r1,r2)*Math.min(r1,r2);
+  var a=r1*r1*Math.acos((d*d+r1*r1-r2*r2)/(2*d*r1));
+  var b=r2*r2*Math.acos((d*d+r2*r2-r1*r1)/(2*d*r2));
+  var c=0.5*Math.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2));
+  return a+b-c;
+}
+function updateBlocked(removedId){
+  // 增量模式：只更新受移除螺丝影响的下层螺丝
+  if(removedId!==undefined){
+    var rs=screws.find(function(s){return s.id===removedId});
+    if(!rs)return;
+    var rr=rs.size/2;
+    for(var i=0;i<screws.length;i++){
+      var s=screws[i];if(s.removed||s.layer<=rs.layer)continue;
+      var dx=s.x-rs.x,dy=s.y-rs.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<rr+s.size/2){
+        var tc=0,myA=Math.PI*(s.size/2)*(s.size/2);
+        for(var j=0;j<screws.length;j++){
+          var o=screws[j];if(o.removed||o.id===removedId||o.layer>=s.layer)continue;
+          var dx2=s.x-o.x,dy2=s.y-o.y,d2=Math.sqrt(dx2*dx2+dy2*dy2);
+          if(d2<(s.size/2)+o.size/2)tc+=circleOverlap(s.size/2,o.size/2,d2);
+        }
+        var was=s.blocked;
+        s.blockedPct=Math.min(1,tc/myA);
+        s.blocked=s.blockedPct>Math.max(0.35,0.5-Math.floor(level/10)*0.05);
+        if(was!==s.blocked)syncScrewDOM(s);
+      }
+    }
+    return;
+  }
+  // 全量模式
+  screws.forEach(function(s){s.blocked=!1;s.blockedPct=0});
+  var r=screws[0]?screws[0].size/2:10;
+  for(var i=0;i<screws.length;i++){
+    var s=screws[i];if(s.removed)continue;
+    var totalCovered=0,myArea=Math.PI*r*r;
+    for(var j=0;j<screws.length;j++){
+      var o=screws[j];if(o.removed||o.layer>=s.layer)continue;
+      var dx=s.x-o.x,dy=s.y-o.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<r+o.size/2)totalCovered+=circleOverlap(r,o.size/2,dist);
+    }
+    s.blockedPct=Math.min(1,totalCovered/myArea);
+    s.blocked=s.blockedPct>Math.max(0.35,0.5-Math.floor(level/10)*0.05);
+  }
+  screws.forEach(function(s){if(!s.removed)syncScrewDOM(s)});
+}
+function syncScrewDOM(s){
+  var el=board.querySelector('.screw[data-id="'+s.id+'"]');
+  if(!el)return;
+  if(s.blocked)el.classList.add('blocked');
+  else{if(el.classList.contains('blocked')){el.style.transition='none';el.classList.remove('blocked');el.offsetHeight;el.style.transition=''}else el.classList.remove('blocked')}
+  el.style.setProperty('--layer-opacity',getLayerOpacity(s));
+}
+
+function isSolvable(){
+  // --- DFS 回溯求解器：验证关卡数学可解 ---
+  var maxDepth = 300;
+  var visited = {};
+  var result = {solvable:false};
+  var startTime = Date.now();
+  var timeLimit = 3000; // 3秒超时
+
+  // 预计算遮挡关系图（单向：上→下）
+  var N = screws.length;
+  var coveredBy = {}; // screwId → [遮挡它的screwId列表]
+  var blockThreshold = Math.max(0.35, 0.5 - Math.floor(level / 10) * 0.05);
+  for (var i = 0; i < N; i++) {
+    if (screws[i].removed) continue;
+    coveredBy[screws[i].id] = [];
+  }
+  for (var i = 0; i < N; i++) {
+    var s = screws[i];
+    if (s.removed) continue;
+    var r = s.size / 2;
+    var myArea = Math.PI * r * r;
+    var totalCovered = 0;
+    var covering = [];
+    for (var j = 0; j < N; j++) {
+      var o = screws[j];
+      if (o.removed || o.id === s.id) continue;
+      if (o.layer >= s.layer) continue;
+      var dx = s.x - o.x, dy = s.y - o.y, dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < r + o.size / 2) {
+        covering.push(o.id);
+        totalCovered += circleOverlap(r, o.size / 2, dist);
+      }
+    }
+    if (totalCovered / myArea > blockThreshold) {
+      coveredBy[s.id] = covering.map(function(cid) {
+        return {id: cid, area: 0}; // area will be computed when needed
+      });
+      // Pre-compute individual overlap areas for incremental unblock check
+      for (var ci = 0; ci < coveredBy[s.id].length; ci++) {
+        var oid = coveredBy[s.id][ci].id;
+        var o = screws.find(function(x) { return x.id === oid; });
+        if (o) {
+          var dx2 = s.x - o.x, dy2 = s.y - o.y, dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+          coveredBy[s.id][ci].area = circleOverlap(r, o.size / 2, dist2) / myArea;
+        }
+      }
+    }
+  }
+
+  // 判断screw当前是否被遮挡（累计覆盖率）
+  function isBlocked(sid, removed) {
+    var cb = coveredBy[sid];
+    if (!cb || cb.length === 0) return false;
+    var sum = 0;
+    for (var i = 0; i < cb.length; i++) {
+      if (!removed[cb[i].id]) sum += cb[i].area;
+    }
+    return sum > blockThreshold;
+  }
+
+  function encode(remainingCount, slotsColors) {
+    return remainingCount + '|' + slotsColors.slice().sort().join(',');
+  }
+
+  function dfs(removed, slotsArr, remainingCount, depth) {
+    if (Date.now() - startTime > timeLimit) return false;
+    if (depth > maxDepth) return false;
+    if (remainingCount === 0 && slotsArr.length === 0) {
+      result.solvable = true;
+      return true;
+    }
+
+    var key = encode(remainingCount, slotsArr);
+    if (visited[key]) return false;
+    visited[key] = true;
+
+    // 收集未遮挡的螺丝
+    var candidates = [];
+    for (var i = 0; i < N; i++) {
+      var sid = screws[i].id;
+      if (removed[sid]) continue;
+      if (!isBlocked(sid, removed)) {
+        candidates.push(i);
+      }
+    }
+
+    // 启发式排序：槽内同色优先
+    candidates.sort(function(a, b) {
+      var ca = screws[a], cb = screws[b];
+      var inA = 0, inB = 0;
+      for (var i = 0; i < slotsArr.length; i++) {
+        if (slotsArr[i] === ca.color.name) inA++;
+        if (slotsArr[i] === cb.color.name) inB++;
+      }
+      return inB - inA;
+    });
+
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var idx = candidates[ci];
+      var screw = screws[idx];
+
+      // 槽满检查
+      if (slotsArr.length >= 5) {
+        var matchCount = 0;
+        for (var i = 0; i < slotsArr.length; i++) {
+          if (slotsArr[i] === screw.color.name) matchCount++;
+        }
+        if (matchCount < 2) continue;
+      }
+
+      // 模拟
+      var newSlots = slotsArr.slice();
+      newSlots.push(screw.color.name);
+      // 消除
+      var cnt = {};
+      for (var i = 0; i < newSlots.length; i++) {
+        cnt[newSlots[i]] = (cnt[newSlots[i]] || 0) + 1;
+      }
+      for (var cn in cnt) {
+        if (cnt[cn] >= 3) {
+          newSlots = newSlots.filter(function(c) { return c !== cn; });
+          break;
+        }
+      }
+
+      var newRemoved = {};
+      for (var k in removed) newRemoved[k] = removed[k];
+      newRemoved[screw.id] = true;
+
+      if (dfs(newRemoved, newSlots, remainingCount - 1, depth + 1)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var removedInit = {};
+  for (var i = 0; i < N; i++) {
+    if (screws[i].removed) removedInit[screws[i].id] = true;
+  }
+  var remainingInit = N - Object.keys(removedInit).length;
+  var slotsInit = [];
+  for (var i = 0; i < slots.length; i++) {
+    if (slots[i]) slotsInit.push(slots[i].color.name);
+  }
+
+  return dfs(removedInit, slotsInit, remainingInit, 0) || (function() {
+    console.warn('Level '+level+' solver timeout/unsolvable');
+    return false;
+  })();
+}
+function getLayerOpacity(screw){
+  var layers=[],seen={};
+  screws.forEach(function(s){if(!s.removed&&!seen[s.layer]){seen[s.layer]=1;layers.push(s.layer)}});
+  layers.sort(function(a,b){return a-b});
+  var rank=layers.indexOf(screw.layer);
+  return Math.max(0.25,1-rank*0.15);
+}
+
+function renderAll(){
+  var boardEl=$('board');boardEl.querySelectorAll('.screw,.hole').forEach(function(el){el.remove()});renderHoles();screws.forEach(function(s){if(s.removed)return;var extra='';if(s.blocked)extra=' blocked';var el=document.createElement('div');el.className='screw face-'+s.color.face+extra;el.setAttribute('data-id',s.id);el.style.left=s.x+'%';el.style.top=s.y+'%';el.style.width=s.size+'%';el.style.height=s.size+'%';el.style.setProperty('--layer-opacity',getLayerOpacity(s));var inner=document.createElement('div');inner.className='screw-inner';inner.style.background='radial-gradient(circle at 35% 35%,'+s.color.light+','+s.color.hex+' 50%,'+shadeColor(s.color.hex,-30)+')';if(s.color.pattern)inner.classList.add('pat-'+s.color.pattern);el.appendChild(inner);el.addEventListener('click',onScrewClick);boardEl.appendChild(el)})}
+
+function addHole(screw){if(!screw.removed)return;var ex=board.querySelector('.hole[data-hole-for=\\\"'+screw.id+'\\\"]');if(!ex){var h=document.createElement('div');h.className='hole empty';h.setAttribute('data-hole-for',screw.id);h.style.left=screw.x+'%';h.style.top=screw.y+'%';h.style.width=(screw.size*.76)+'%';h.style.height=(screw.size*.76)+'%';board.prepend(h)}}
+function renderHoles(){
+  var existing=board.querySelectorAll('.hole');existing.forEach(function(el){el.remove()});
+  screws.forEach(function(s){
+    if(!s.removed)return;
+    var h=document.createElement('div');h.className='hole empty';
+    h.style.left=s.x+'%';h.style.top=s.y+'%';
+    h.style.width=(s.size*.76)+'%';h.style.height=(s.size*.76)+'%';
+    board.appendChild(h);
+  })
+}
+
+function shadeColor(hex,percent){var num=parseInt(hex.slice(1),16),amt=Math.round(2.55*percent);var R=Math.max(0,Math.min(255,(num>>16)+amt)),G=Math.max(0,Math.min(255,(num>>8&0xFF)+amt)),B=Math.max(0,Math.min(255,(num&0xFF)+amt));return '#'+(0x1000000+R*0x10000+G*0x100+B).toString(16).slice(1)}
+function updateRemain(){$('remainCount').textContent=screws.filter(function(s){return!s.removed}).length}
+function showToast(msg){var t=document.getElementById('toastMsg');if(!t)return;t.textContent=msg;t.style.display='';t.getAnimations().forEach(function(a){a.cancel()});t.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'},{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-8px)'}],{duration:1600,fill:'forwards'}).onfinish=function(){t.style.display='none'}}
+
+// ═══════ 道具 ═══════
+function useProp(type){if(processing){showToast('动画中，稍等');return}if(paused)return;if(props[type]<=0){showToast(authState.token?'道具不足，去商店购买':'登录后解锁道具');return}var ok;if(type==='undo'){ok=doUndo()}else if(type==='bomb'){ok=doBomb()}else if(type==='peek'){ok=doPeek()}else if(type==='lightning'){ok=doLightning()}else if(type==='shuffle'){ok=doShuffle()}if(ok){props[type]--;updatePropUI();saveProps()}else{var btn=$('prop'+type.charAt(0).toUpperCase()+type.slice(1));if(btn){btn.style.animation='none';btn.offsetHeight;btn.style.animation='0.4s ease-out propShake'}}}
+function doUndo(){if(history.length===0)return!1;$('overlayLose').classList.remove('show');var last=history.pop();if(last.shuffleColors){last.shuffleColors.forEach(function(sc,i){var s=screws.find(function(x){return x.id===sc.id});if(s)s.color=sc.color})}else{if(last.screw){last.screw.removed=!1;last.screw.removing=!1}updateBlocked()}slots=last.slots;score=last.score;combo=last.combo;$('scoreVal').textContent=score;$('comboCount').textContent='×'+combo;updateSlotsUI();renderAll();updateRemain();sfxUndo();return!0}
+function doBomb(){if(slots.length===0)return!1;sfxBomb();var returned=slots.map(function(s){if(!s)return null;var sc=screws.find(function(x){return x.id===s.id});if(sc){sc.removed=!1;sc.blocked=!0}return s});history.push({screw:null,slots:slots.map(function(s){return s?{id:s.id,color:s.color}:null}),score:score,combo:combo});slots=[];updateSlotsUI();updateBlocked();renderAll();updateRemain();return!0}
+function doPeek(){var targets=screws.filter(function(s){return!s.removed&&s.blocked});if(!targets.length)return!1;targets.forEach(function(s){var el=board.querySelector('.screw[data-id="'+s.id+'"]');if(el){var h=s.color.hex,n=parseInt(h.slice(1),16);el.style.setProperty('--peek-color','rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+',0.5)');el.classList.add('peek-highlight')}});sfxPeek();setTimeout(function(){targets.forEach(function(s){var el=board.querySelector('.screw[data-id="'+s.id+'"]');if(el){el.classList.remove('peek-highlight');el.style.removeProperty('--peek-color')}})},3800);return!0}
+function doLightning(){var filled=slots.filter(Boolean);if(filled.length<2){showToast('槽内需≥2个');return!1}var count={};slots.forEach(function(s,i){if(!s)return;var k=s.color.name;if(!count[k])count[k]=[];count[k].push(i)});var best=null;for(var cn in count){if(count[cn].length>=2&&(!best||count[cn].length>best.length))best=count[cn]}if(!best){showToast('槽内无≥2个同色');return!1}history.push({screw:null,slots:slots.map(function(s){return s?{id:s.id,color:s.color}:null}),score:score,combo:combo});var n=Math.min(best.length,3),remove=best.slice(0,n).sort(function(a,b){return b-a});remove.forEach(function(i){slots.splice(i,1)});slots=slots.filter(Boolean);var pts=n*10;score+=pts;$('scoreVal').textContent=score;showScore(pts);updateSlotsUI();updateRemain();if(n===3)sfxMatch();else sfxClick();return!0}
+function doShuffle(){var alive=screws.filter(function(s){return!s.removed});if(alive.length===0)return!1;var colors=[];alive.forEach(function(s){colors.push(s.color)});history.push({screw:null,slots:[],score:score,combo:combo,shuffleColors:alive.map(function(s){return{id:s.id,color:s.color}})});for(var i=colors.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var tmp=colors[i];colors[i]=colors[j];colors[j]=tmp}alive.forEach(function(s,i){s.color=colors[i]});renderAll();sfxMatch();return!0}
+function updatePropUI(){['undo','bomb','peek','lightning','shuffle'].forEach(function(k){var b=$('badge'+k.charAt(0).toUpperCase()+k.slice(1));if(b){b.textContent=props[k];b.className='prop-badge'+(props[k]===0?' zero':'')}var btn=$('prop'+k.charAt(0).toUpperCase()+k.slice(1));if(btn)btn.style.opacity=props[k]===0?'0.35':'1'});var lbc=$('loseBombCount');if(lbc)lbc.textContent=props.bomb;var lbb=$('btnLoseBomb');if(lbb)lbb.disabled=props.bomb===0}
+
+// ═══════ 商店 ═══════
+const SHOP_ITEMS=[{id:'undo',icon:'↩️',name:'撤回',desc:'撤回一步',price:10,qty:5},{id:'bomb',icon:'💣',name:'炸弹',desc:'清空收集槽',price:10,qty:3},{id:'peek',icon:'👁️',name:'透视',desc:'高亮可点糖果3秒',price:10,qty:3},{id:'lightning',icon:'⚡',name:'闪电',desc:'消除槽内最多颜色×2',price:15,qty:3},{id:'shuffle',icon:'🔀',name:'洗牌',desc:'随机重排棋盘颜色',price:20,qty:3}];
+function showShop(){sfxShop();$('shopCoinVal').textContent=coins;var html='';SHOP_ITEMS.forEach(function(item){var canBuy=coins>=item.price;html+='<div class="shop-item"><span class="shop-icon">'+item.icon+'</span><div class="shop-info"><div class="shop-name">'+item.name+' ×'+item.qty+'</div><div class="shop-desc">'+item.desc+'</div></div><button class="shop-buy" onclick="buyItem(\''+item.id+'\','+item.price+','+item.qty+')" '+(canBuy?'':'disabled')+'>🪙'+item.price+'</button></div>'});$('shopGrid').innerHTML=html;$('shopOverlay').classList.add('show')}
+function hideShop(){$('shopOverlay').classList.remove('show')}
+function buyItem(id,price,qty){if(coins<price)return;sfxBuy();coins-=price;props[id]+=qty;saveProps();updatePropUI();$('shopCoinVal').textContent=coins;var btns=$('shopGrid').querySelectorAll('.shop-buy');SHOP_ITEMS.forEach(function(item,i){if(btns[i])btns[i].disabled=coins<item.price})}
+
+// ═══════ 暂停 ═══════
+function togglePause(){if(paused){resumeGame();return}paused=!0;savePauseState();$('pauseOverlay').classList.add('show');$('pauseBtn').textContent='▶'}
+function resumeGame(){paused=!1;$('pauseOverlay').classList.remove('show');$('pauseBtn').textContent='⏸'}
+function toggleMode(){gameMode=gameMode===0?1:0;updateModeUI();saveMode()}
+function updateModeUI(){var b=$('modeBtn');if(gameMode===1){b.textContent='👿 地狱';b.style.background='rgba(239,68,68,.25)';b.style.color='#fca5a5';b.style.border='1px solid rgba(239,68,68,.4)';b.style.boxShadow='0 0 14px rgba(239,68,68,.3)';b.style.animation='pulse 0.8s ease-in-out infinite'}else{b.textContent='😊 普通';b.style.background='rgba(99,102,241,.15)';b.style.color='#c7d2fe';b.style.border='1px solid rgba(255,255,255,.12)';b.style.boxShadow='none';b.style.animation='none'}var badge=$('levelBadge');if(badge){badge.textContent='第 '+level+' 关'+(isDailyChallenge?' 🔥 每日 ▼':' ▼');if(gameMode===1)badge.textContent=badge.textContent.replace(' ▼',' 👿 ▼')}}
+function saveMode(){localStorage.setItem('game_mode',gameMode)}
+function savePauseState(){var state={level:level,score:score,combo:combo,coins:coins,totalScrewCount:totalScrewCount,props:{undo:props.undo,bomb:props.bomb,peek:props.peek,lightning:props.lightning,shuffle:props.shuffle},screws:screws.map(function(s){return{id:s.id,color:s.color.name,x:s.x,y:s.y,size:s.size,layer:s.layer,removed:s.removed,blocked:s.blocked}}),slots:slots.map(function(s){return s?{id:s.id,color:s.color.name}:null}),history:history.map(function(h){return{screwId:h.screw?h.screw.id:null,slots:h.slots.map(function(s){return s?{id:s.id,color:s.color.name}:null}),score:h.score,combo:h.combo}})};localStorage.setItem('game_pause',JSON.stringify(state))}
+function loadPauseState(){var raw=localStorage.getItem('game_pause');if(!raw)return!1;try{var st=JSON.parse(raw);level=st.level;score=st.score;combo=st.combo;coins=st.coins;totalScrewCount=st.totalScrewCount||st.screws.length;props={undo:st.props.undo,bomb:st.props.bomb,peek:st.props.peek,lightning:typeof st.props.lightning==='number'?st.props.lightning:3,shuffle:typeof st.props.shuffle==='number'?st.props.shuffle:3};screws=st.screws.map(function(s){var c=COLORS.find(function(x){return x.name===s.color});return{id:s.id,color:c||COLORS[0],x:s.x,y:s.y,size:s.size,layer:s.layer,removed:s.removed,blocked:s.blocked,removing:!1}});slots=st.slots.map(function(s){if(!s)return null;var c=COLORS.find(function(x){return x.name===s.color});return{id:s.id,color:c||COLORS[0]}});history=st.history.map(function(h){return{screw:screws.find(function(s){return s.id===h.screwId}),slots:h.slots.map(function(s){if(!s)return null;var c=COLORS.find(function(x){return x.name===s.color});return{id:s.id,color:c||COLORS[0]}}),score:h.score,combo:h.combo}});updateBlocked();buildSlots();updateSlotsUI();renderAll();updateRemain();levelEntryScore=score;localStorage.removeItem('game_pause');return!0}catch(e){return!1}}
+function clearPauseState(){localStorage.removeItem('game_pause')}
+
+// ═══════ 逐步存档 ═══════
+var _autoSaveTimer=0,_autoSaveDirty=!1;
+function autoSave(){
+  if(paused)return;
+  var now=Date.now();
+  if(now-_autoSaveTimer<500){_autoSaveDirty=!0;return}
+  _autoSaveTimer=now;_autoSaveDirty=!1;
+  var state={lv:level,sc:score,cb:combo,coins:coins,props:{undo:props.undo,bomb:props.bomb,peek:props.peek,lightning:props.lightning,shuffle:props.shuffle},screws:screws.map(function(s){return{id:s.id,cn:s.color.name,x:s.x,y:s.y,sz:s.size,ly:s.layer,rm:s.removed,bl:s.blocked}}),slots:slots.map(function(s){return s?{id:s.id,cn:s.color.name}:null}),ts:totalScrewCount,hist:history.length};
+  localStorage.setItem('game_autosave',JSON.stringify(state));
+  setTimeout(function(){if(_autoSaveDirty)autoSave()},550);
+}
+function loadAutoSave(){
+  var raw=localStorage.getItem('game_autosave');
+  if(!raw)return!1;
+  try{var st=JSON.parse(raw);
+    level=st.lv;score=st.sc;combo=st.cb;coins=st.coins;
+    if(st.props){props.undo=st.props.undo;props.bomb=st.props.bomb;props.peek=st.props.peek;props.lightning=st.props.lightning||3;props.shuffle=st.props.shuffle||3}
+    screws=st.screws.map(function(s){var c=COLORS.find(function(x){return x.name===s.cn});return{id:s.id,color:c||COLORS[0],x:s.x,y:s.y,size:s.sz,layer:s.ly,removed:s.rm,blocked:s.bl,removing:!1}});
+    slots=st.slots.map(function(s){if(!s)return null;var c=COLORS.find(function(x){return x.name===s.cn});return{id:s.id,color:c||COLORS[0]}});
+    totalScrewCount=st.ts||st.screws.length;history=[];levelEntryScore=score;
+    updateBlocked();buildSlots();updateSlotsUI();renderAll();updateRemain();
+    localStorage.removeItem('game_autosave');
+    return!0;
+  }catch(e){return!1}
+}
+function clearAutoSave(){localStorage.removeItem('game_autosave')}
+
+function saveProps(){localStorage.setItem('game_props',JSON.stringify({undo:props.undo,bomb:props.bomb,peek:props.peek,lightning:props.lightning,shuffle:props.shuffle,coins:coins,level:level,score:score}))}
+function loadProps(){try{var d=JSON.parse(localStorage.getItem('game_props')||'{}');if(typeof d.undo==='number')props.undo=d.undo;if(typeof d.bomb==='number')props.bomb=d.bomb;if(typeof d.peek==='number')props.peek=d.peek;if(typeof d.lightning==='number')props.lightning=d.lightning;if(typeof d.shuffle==='number')props.shuffle=d.shuffle;if(typeof d.coins==='number')coins=d.coins;if(typeof d.level==='number')level=d.level;if(typeof d.score==='number')score=d.score}catch(e){}}
+
+// ═══════ 关卡 ═══════
+function winLevel(){sfxWin();var bonus=level*50;
+  // ⭐ 双维评级（bonus前的真实分数）：步数效率(60%) + 得分倍率(40%)
+  var efficiency=starMoves>0?Math.min(totalScrewCount/starMoves,1):1;
+  var baseScore=totalScrewCount*10;
+  var scoreRate=score>0?Math.min(score/baseScore/1.5,1):0;
+  var combined=efficiency*0.6+scoreRate*0.4;
+  var stars=combined>=0.85?3:combined>=0.70?2:1;
+  var starStr='⭐'.repeat(stars)+'☆'.repeat(3-stars);
+  var effPct=Math.round(efficiency*100);
+  var scoreX=((score-levelEntryScore)/baseScore).toFixed(1);
+  $('winStars').innerHTML=starStr+'<br><span style="font-size:14px;color:#94a3b8">步效'+effPct+'%  得分'+scoreX+'x</span>';
+  // 本关理论最高倍率
+  var matches=Math.floor(totalScrewCount/3);
+  var maxCombo=matches>1?5*matches*(matches-1)/2:0;
+  var maxX=((totalScrewCount*10+maxCombo)/(totalScrewCount*10)).toFixed(1);
+  $('winStarInfo').innerHTML='⭐⭐⭐≥85% &nbsp;⭐⭐≥70% &nbsp;|&nbsp;最高得分'+maxX+'x';
+  score+=bonus;
+  var cleared=JSON.parse(localStorage.getItem('game_cleared')||'[]'),firstClear=!cleared.includes(level);
+  if(firstClear){coins+=10;props.undo++;cleared.push(level);localStorage.setItem('game_cleared',JSON.stringify(cleared));$('winSub').textContent='第 '+level+' 关完成 +'+bonus+'分 🪙+10 ↩️+1'}
+  else{$('winSub').textContent='第 '+level+' 关完成 +'+bonus+'分（重复通关无奖励）'}
+  gameMode=0;updateModeUI();saveMode();saveProps();$('scoreVal').textContent=score;$('coinVal').textContent=coins;$('winScore').textContent=score;$('overlayWin').classList.add('show');updatePropUI();submitScore(score);clearAutoSave()}
+function nextLevel(){$('overlayWin').classList.remove('show');$('boardCleared').classList.remove('show');level++;generateLevel();saveProps()}
+function restartLevel(){score=levelEntryScore;$('scoreVal').textContent=score;$('overlayWin').classList.remove('show');$('overlayLose').classList.remove('show');$('boardCleared').classList.remove('show');clearAutoSave();generateLevel()}
+// ═══════ AI 模拟演示 ═══════
+var _simRunning=!1,_simTimer=null;
+function stopSimulate(){_simRunning=!1;if(_simTimer){clearTimeout(_simTimer);_simTimer=null}$('simBadge')&&$('simBadge').remove()}
+function startSimulate(){
+  $('overlayLose').classList.remove('show');restartLevel();
+  setTimeout(function(){
+    _simRunning=!0;
+    var badge=document.createElement('div');
+    badge.id='simBadge';badge.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:200;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;pointer-events:none;animation:pulse 1.2s ease-in-out infinite';
+    badge.textContent='🤖 AI 演示中... 点击任意处停止';
+    document.body.appendChild(badge);
+    document.addEventListener('click',stopSimOnClick,{once:!0});
+    document.addEventListener('keydown',stopSimOnClick,{once:!0});
+    simStep();
+  },300);
+}
+function stopSimOnClick(){if(_simRunning){stopSimulate();sfxClick()}}
+function simStep(){
+  if(!_simRunning)return;
+  if(paused){_simTimer=setTimeout(simStep,200);return}
+  // Check win
+  var active=screws.filter(function(s){return!s.removed});
+  if(active.length===0){stopSimulate();sfxMatch();return}
+  // Check lose
+  if(document.getElementById('overlayLose').classList.contains('show')){
+    // AI failed — auto restart
+    $('overlayLose').classList.remove('show');
+    clearAutoSave();generateLevel();
+    _simTimer=setTimeout(simStep,400);
+    return;
+  }
+  // AI strategy: greedy best pick
+  var slotColors={};
+  slots.forEach(function(s){if(s){slotColors[s.color.name]=(slotColors[s.color.name]||0)+1}});
+  var unblocked=screws.filter(function(s){return!s.removed&&!s.blocked});
+  if(unblocked.length===0){stopSimulate();return}
+  // Priority: colors with 2 in slots → instant match
+  var best=null;
+  for(var cn in slotColors){if(slotColors[cn]>=2){for(var i=0;i<unblocked.length;i++){if(unblocked[i].color.name===cn){best=unblocked[i];break}}if(best)break}}
+  // Second: colors already in slots
+  if(!best){for(var i=0;i<unblocked.length;i++){if(slotColors[unblocked[i].color.name]){best=unblocked[i];break}}}
+  // Third: random
+  if(!best){best=unblocked[Math.floor(Math.random()*unblocked.length)]}
+  // Highlight pick briefly
+  var el=document.querySelector('#board .screw[data-id="'+best.id+'"]');
+  if(el){el.style.outline='2px solid #6366f1';el.style.outlineOffset='2px';setTimeout(function(){el.style.outline='';el.style.outlineOffset=''},250)}
+  processClick(best);
+  _simTimer=setTimeout(simStep,180);
+}
+// ═══════ 关卡选择器 ═══════
+function toggleLevelPicker(){var p=document.getElementById('levelPicker'),b=document.getElementById('levelBadge'),r=b.getBoundingClientRect();p.style.top=(r.bottom+4)+'px';p.style.left=r.left+'px';p.classList.toggle('show');if(p.classList.contains('show'))buildLevelPicker()}
+function buildLevelPicker(){var cleared=JSON.parse(localStorage.getItem('game_cleared')||'[]'),maxLv=Math.max(level,10),list=document.getElementById('levelPickerList'),html='';for(var i=1;i<=maxLv;i++){var unlocked=cleared.includes(i)||i===1,cls='level-picker-item'+(i===level&&unlocked?' current':'')+(unlocked?'':' locked');html+='<button class=\"'+cls+'\"'+(unlocked?' onclick=\"selectLevel('+i+')\"':' disabled')+'>第 '+i+' 关'+(i===level?(unlocked?' 👈':' 🔒'):'')+'</button>'}list.innerHTML=html;var items=list.querySelectorAll('.level-picker-item');if(items[level-1])items[level-1].scrollIntoView({block:'center'})}
+function selectLevel(n){if(processing)return;level=n;score=0;levelEntryScore=0;$('scoreVal').textContent=0;generateLevel();saveProps();document.getElementById('levelPicker').classList.remove('show')}
+// ═══════ 后端 ═══════
+const API_BASE='/api/game';let authState={token:'',nickname:'游客',userId:null};
+(function(){var t=localStorage.getItem('game_token'),n=localStorage.getItem('game_nickname');if(t&&n){authState.token=t;authState.nickname=n;updateUserUI()}})();
+function updateUserUI(){$('ubName').textContent=authState.nickname;if(authState.token){$('btnLogin').textContent='退出';$('btnLogin').onclick=doLogout;$('btnLogin').classList.remove('primary')}else{$('btnLogin').textContent='登录';$('btnLogin').onclick=showLogin;$('btnLogin').classList.add('primary')}}
+async function submitScore(s){try{var h={'Content-Type':'application/json'};if(authState.token)h['Authorization']='Bearer '+authState.token;await fetch(API_BASE+'/score',{method:'POST',headers:h,body:JSON.stringify({score:s,game:'unscrew'})})}catch(e){}}
+function showLogin(){$('loginOverlay').classList.add('show');$('phone').focus()}
+function hideLogin(){$('loginOverlay').classList.remove('show')}
+let authMode='login';
+function switchTab(t){authMode=t;document.querySelectorAll('.modal-tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===t)});$('nicknameField').style.display=t==='register'?'block':'none';$('btnSubmitAuth').textContent=t==='register'?'注册':'登录'}
+async function doAuth(){var phone=$('phone').value.trim(),password=$('password').value.trim();if(!/^\d{11}$/.test(phone))return showErr('请输入11位手机号');if(password.length<6)return showErr('密码至少6位');var body={phone:phone,password:password};if(authMode==='register'){var nick=$('nickname').value.trim();if(nick.length<2||nick.length>8)return showErr('昵称需2-8个字符');body.nickname=nick}var url=API_BASE+(authMode==='register'?'/register':'/login')+'?game=unscrew';try{var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});var d=await r.json();if(!r.ok)throw new Error(d.detail||'操作失败');authState.token=d.token;authState.nickname=d.nickname;localStorage.setItem('game_token',d.token);localStorage.setItem('game_nickname',d.nickname);localStorage.setItem('game_phone',phone);updateUserUI();hideLogin();$('phone').value='';$('password').value='';$('nickname').value='';if(authMode==='register'){localStorage.removeItem('game_cleared');level=1;score=0;coins=30;props={undo:5,bomb:3,peek:3,lightning:3,shuffle:3};saveProps();localStorage.setItem('game_date',new Date().toDateString())}else{loadProps()}updatePropUI();generateLevel();$('levelBadge').textContent='第 '+level+' 关 ▼';$('scoreVal').textContent=score;$('coinVal').textContent=coins}catch(e){showErr(e.message)}}
+function showErr(m){$('loginError').textContent=m;$('loginError').style.display='block';setTimeout(function(){$('loginError').style.display='none'},3000)}
+function doLogout(){authState={token:'',nickname:'游客',userId:null};localStorage.removeItem('game_token');localStorage.removeItem('game_nickname');localStorage.removeItem('game_phone');localStorage.removeItem('game_props');localStorage.removeItem('game_pause');localStorage.removeItem('game_cleared');updateUserUI();level=1;score=0;coins=0;props={undo:0,bomb:0,peek:0,lightning:0,shuffle:0};buildSlots();generateLevel();updatePropUI();$('scoreVal').textContent=0;$('coinVal').textContent=0;$('levelBadge').textContent='第 1 关 ▼'}
+
+// ═══════ 排行榜 ═══════
+let lbPeriod='all';
+function showLeaderboard(){var sel=$('lbLevel');sel.innerHTML='<option value="">全部</option>';for(var i=1;i<=Math.max(level,20);i++)sel.innerHTML+='<option value="'+i+'">第'+i+'关</option>';$('lbOverlay').classList.add('show');loadLeaderboard()}
+function hideLeaderboard(){$('lbOverlay').classList.remove('show')}
+function switchPeriod(p){lbPeriod=p;document.querySelectorAll('#lbPeriod button').forEach(function(b){b.classList.toggle('active',b.dataset.p===p)});loadLeaderboard()}
+async function loadLeaderboard(){var lv=$('lbLevel').value,url=API_BASE+'/leaderboard?period='+lbPeriod+'&game=unscrew&limit=20';if(lv)url+='&level='+lv;$('lbList').innerHTML='<div class="lb-empty">加载中...</div>';try{var r=await fetch(url);var d=await r.json();if(!d.length){$('lbList').innerHTML='<div class="lb-empty">暂无数据</div>';return}var myNick=authState.nickname,html='';d.forEach(function(row,i){var rc=i<3?'r'+(i+1):'',isMe=row.nickname===myNick;html+='<div class="lb-row'+(isMe?' me':'')+'"><span class="lb-rank '+rc+'">'+(i+1)+'</span><span class="lb-name">'+row.nickname+'</span><span class="lb-score">'+row.best_score+'</span><span class="lb-games">'+row.total_games+'局</span></div>'});$('lbList').innerHTML=html;$('lbStats').textContent='共 '+d.length+' 名玩家 · '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}catch(e){$('lbList').innerHTML='<div class="lb-empty">加载失败</div>'}}
+
+
+// ═══════ 每日签到 ═══════
+const CHECKIN_REWARDS=[
+  {coins:10,icon:'🪙',label:'+10金币'},
+  {coins:15,props:{undo:1},icon:'🪙↩️',label:'+15金币 +撤回'},
+  {coins:20,icon:'🪙',label:'+20金币'},
+  {coins:25,props:{bomb:1},icon:'🪙💣',label:'+25金币 +炸弹'},
+  {coins:30,icon:'🪙',label:'+30金币'},
+  {coins:40,props:{peek:1},icon:'🪙👁️',label:'+40金币 +透视'},
+  {coins:50,props:{lightning:1,shuffle:1},icon:'🎁',label:'+50金币 +闪电+洗牌'}
+];
+function getCheckinState(){
+  var phone=localStorage.getItem('game_phone')||'guest';
+  try{return JSON.parse(localStorage.getItem('checkin_'+phone)||'{}')}catch(e){return{}}
+}
+function saveCheckinState(s){
+  var phone=localStorage.getItem('game_phone')||'guest';
+  localStorage.setItem('checkin_'+phone,JSON.stringify(s))
+}
+function showCheckin(){
+  var cs=getCheckinState(),today=new Date().toDateString();
+  if(cs.lastDate&&cs.lastDate!==today){
+    var last=new Date(cs.lastDate),now=new Date(today);
+    var diff=(now-last)/86400000;
+    if(diff>1){cs={claimed:[],streak:0,lastDate:''};saveCheckinState(cs)}
+  }
+  var grid=$('checkinGrid'),btn=$('checkinBtn'),html='',isLogin=!!authState.token;
+  // 游客模式：全部显示为待签到
+  var displayState=isLogin?cs:{claimed:[],streak:0,lastDate:''};
+  var alreadyChecked=displayState.lastDate===today;
+  for(var i=0;i<7;i++){
+    var cls='checkin-day',icon=CHECKIN_REWARDS[i].icon,label='第'+(i+1)+'天';
+    if(displayState.claimed&&displayState.claimed.includes(i)){cls+=' claimed';icon='✅';label='已领'}
+    else if(!alreadyChecked&&i===(displayState.streak||0)){cls+=' today'}
+    else{cls+=' locked'}
+    html+='<div class="'+cls+'"'+(cls.includes('today')&&isLogin?' onclick="doCheckin()"':'')+'><span class="cd-icon">'+icon+'</span><span class="cd-label">'+label+'</span></div>';
+  }
+  grid.innerHTML=html;
+  if(!isLogin){btn.textContent='🔒 请先登录';btn.disabled=!0}
+  else if(alreadyChecked){btn.textContent='✅ 今日已签';btn.disabled=!0}
+  else{btn.textContent='🎁 签到领奖';btn.disabled=!1}
+  $('checkinOverlay').classList.add('show');
+}
+function hideCheckin(){$('checkinOverlay').classList.remove('show')}
+let checkinLock=!1;
+function doCheckin(){
+  if(!authState.token){hideCheckin();showLogin();return}
+  if(checkinLock)return;checkinLock=!0;
+  var cs=getCheckinState(),today=new Date().toDateString();
+  if(cs.lastDate===today){checkinLock=!1;return} // 今天已签过
+  var idx=cs.streak||0;
+  var r=CHECKIN_REWARDS[idx];
+  coins+=r.coins;
+  if(r.props){for(var k in r.props)props[k]=(props[k]||0)+r.props[k]}
+  saveProps();updatePropUI();$('coinVal').textContent=coins;
+  if(!cs.claimed)cs.claimed=[];
+  cs.claimed.push(idx);cs.streak=(idx+1)%7;cs.lastDate=today;
+  saveCheckinState(cs);
+  sfxBuy();showCheckin();
+  checkinLock=!1;
+}
+
+// ═══════ 战绩分享卡 ═══════
+function generateShareCard(){
+  var cv=document.createElement('canvas');cv.width=600;cv.height=800;
+  var ctx=cv.getContext('2d');
+  var bg=ctx.createLinearGradient(0,0,0,800);
+  bg.addColorStop(0,'#0f0f2d');bg.addColorStop(.5,'#1a1a3e');bg.addColorStop(1,'#0d0d1f');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,600,800);
+  ctx.fillStyle='rgba(255,255,255,.15)';
+  for(var i=0;i<60;i++){var sx=Math.random()*600,sy=Math.random()*400,sr=Math.random()*2+.5;ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill()}
+  ctx.fillStyle='#fbbf24';ctx.font='bold 46px -apple-system,sans-serif';ctx.textAlign='center';
+  ctx.fillText('🎉 萌糖消了个消',300,80);
+  ctx.fillStyle='#c7d2fe';ctx.font='bold 28px -apple-system,sans-serif';
+  ctx.fillText('第 '+level+' 关 通关！',300,140);
+  ctx.strokeStyle='rgba(251,191,36,.3)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(100,170);ctx.lineTo(500,170);ctx.stroke();
+  ctx.fillStyle='#fbbf24';ctx.font='bold 80px -apple-system,sans-serif';
+  ctx.fillText(score,300,270);
+  ctx.fillStyle='#94a3b8';ctx.font='20px -apple-system,sans-serif';
+  ctx.fillText('总得分',300,310);
+  var details=[{label:'金币',val:'🪙 '+coins},{label:'连击',val:'×'+combo},{label:'萌糖颜色',val:COLORS.length+'种'}];
+  var dx=80;
+  for(var d=0;d<details.length;d++){
+    var item=details[d];
+    ctx.fillStyle='rgba(255,255,255,.06)';roundRect(ctx,dx,350,120,80,12);ctx.fill();
+    ctx.fillStyle='#64748b';ctx.font='13px -apple-system,sans-serif';ctx.fillText(item.label,dx+60,390);
+    ctx.fillStyle='#e2e8f0';ctx.font='bold 22px -apple-system,sans-serif';ctx.fillText(item.val,dx+60,420);
+    dx+=150;
+  }
+  var now=new Date(),ds=now.getFullYear()+'.'+(now.getMonth()+1)+'.'+now.getDate();
+  ctx.fillStyle='#64748b';ctx.font='16px -apple-system,sans-serif';ctx.fillText(ds,300,500);
+  ctx.fillStyle='rgba(251,191,36,.1)';roundRect(ctx,60,550,480,180,20);ctx.fill();
+  ctx.fillStyle='#94a3b8';ctx.font='16px -apple-system,sans-serif';
+  ctx.fillText('扫码来挑战，看你能过几关！',300,600);
+  ctx.fillStyle='#fbbf24';ctx.font='bold 24px -apple-system,sans-serif';
+  ctx.fillText('ct256.cn/unscrew',300,650);
+  for(var s=0;s<5;s++){var sc=COLORS[s%COLORS.length];ctx.fillStyle=sc.hex;ctx.beginPath();ctx.arc(80+s*110,730,22,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.arc(80+s*110,730,22,0,Math.PI*2);ctx.fill();ctx.fillStyle=sc.light;ctx.beginPath();ctx.arc(72+s*110,720,6,0,Math.PI*2);ctx.fill()}
+  $('shareImg').src=cv.toDataURL('image/png');
+  $('shareOverlay').classList.add('show');
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+function hideShare(){$('shareOverlay').classList.remove('show')}
+
+// ═══════ 新手引导 ═══════
+const TUT_STEPS=[
+  {icon:'🍬',title:'点击萌糖',desc:'点击彩色萌糖把它摘下来，萌糖会自动飞入下方收集槽'},
+  {icon:'✨',title:'凑齐3个消除',desc:'收集槽里凑齐3个同色萌糖自动消除，获得30分！'},
+  {icon:'🔥',title:'连击加分',desc:'连续消除触发连击，每次连击额外加分。3连击以上有大奖！'},
+  {icon:'💣',title:'道具助阵',desc:'卡住了用道具：撤回/炸弹/透视/闪电/洗牌，商店购买更划算'}
+];
+let tutIdx=0,tutDone=localStorage.getItem('tut_done');
+function showTutorial(){
+  if(tutDone||level>3)return;
+  tutIdx=0;renderTut();$('tutOverlay').classList.add('show');
+}
+function renderTut(){
+  var s=TUT_STEPS[tutIdx];$('tutIcon').textContent=s.icon;$('tutTitle').textContent=s.title;$('tutDesc').textContent=s.desc;
+  var dots='';
+  for(var i=0;i<TUT_STEPS.length;i++)dots+='<div class="tut-dot'+(i===tutIdx?' active':'')+'"></div>';
+  $('tutDots').innerHTML=dots;
+  $('tutNextBtn').textContent=tutIdx===TUT_STEPS.length-1?'🎮 开始游戏':'下一步';
+}
+function nextTutorial(){
+  tutIdx++;
+  if(tutIdx>=TUT_STEPS.length){skipTutorial();return}
+  renderTut();
+}
+function skipTutorial(){$('tutOverlay').classList.remove('show');localStorage.setItem('tut_done','1');tutDone='1'}
+
+// ═══════ 初始化 ═══════
+function initGame(){var m=location.search.match(/[?&]level=(\d+)/);var _ul=!!m;if(m){level=parseInt(m[1])||1}
+  gameMode=parseInt(localStorage.getItem('game_mode'))||0;updateModeUI();if(!authState.token){_ul||(level=1);score=0;coins=0;props={undo:0,bomb:0,peek:0,lightning:0,shuffle:0};localStorage.removeItem('game_pause');localStorage.removeItem('game_cleared')}
+  else{
+  var today=new Date().toDateString(),last=localStorage.getItem('game_date');
+  if(last!==today){coins=Math.max(coins,30);props={undo:Math.max(props.undo,5),bomb:Math.max(props.bomb,3),peek:Math.max(props.peek,3),lightning:Math.max(props.lightning,3),shuffle:Math.max(props.shuffle,3)};saveProps();localStorage.setItem('game_date',today);clearPauseState()}
+  else{try{var d=JSON.parse(localStorage.getItem('game_props')||'{}');if(typeof d.level==='number'&&!_ul)level=d.level;if(typeof d.score==='number')score=d.score;if(typeof d.coins==='number')coins=d.coins}catch(e){}}
+  if(loadPauseState()){updatePropUI();$('levelBadge').textContent='第 '+level+' 关 ▼';$('scoreVal').textContent=score;$('coinVal').textContent=coins;return}
+  }
+  applySkin(getSkin());buildSlots();if(isDailyMode()){clearAutoSave();generateLevel()}else if(!loadAutoSave()){generateLevel()}else{$('levelBadge').textContent='第 '+level+' 关 ▼';$('scoreVal').textContent=score;$('coinVal').textContent=coins;updatePropUI()}setTimeout(function(){showTutorial()},600);$('btnNext').onclick=nextLevel;$('btnReplay').onclick=restartLevel;$('btnRetry').onclick=restartLevel;$('btnContinue').onclick=restartLevel;if(authState.token)loadProps();updatePropUI();$('coinVal').textContent=coins;updateUserUI()}
+$('btnSubmitAuth').onclick=doAuth;
+['phone','password','nickname'].forEach(function(id){$(id).addEventListener('keydown',function(e){if(e.key==='Enter')doAuth()})});
+initGame();
+
+// 注入音效选择按钮 + 音量±按钮
+(function(){
+  var p=document.getElementById('themePicker');
+  Object.keys(SFX_T).forEach(function(k){
+    var b=document.createElement('button');
+    b.className='tm-btn'+(k===soundTheme?' active':'');
+    b.textContent=SFX_LABELS[k]||k;
+    b.onclick=function(e){e.stopPropagation();selectTheme(k);updateThemeBtns()};
+    p.appendChild(b);
+  });
+  window.updateThemeBtns=function(){
+    p.querySelectorAll('.tm-btn').forEach(function(b,i){
+      var key=Object.keys(SFX_T)[i];
+      b.classList.toggle('active',key===soundTheme);
+    });
+  };
+  function syncVolUI(){
+    var v=Math.round((masterGain?masterGain.gain.value:0.7)*100);
+    document.getElementById('volLabel').textContent=v;
+    var tb=document.getElementById('themeBtn');
+    if(v===0){soundOn=!1;tb.textContent='🔇';tb.classList.add('muted')}
+    else if(!soundOn){soundOn=!0;tb.textContent='🔊';tb.classList.remove('muted')}
+  }
+  function changeVol(d){
+    var cur=masterGain?masterGain.gain.value:0.7,v=Math.round(Math.max(0,Math.min(1,cur+d/100))*100)/100;
+    if(masterGain)masterGain.gain.value=v;
+    localStorage.setItem('sfx_volume',v);
+    syncVolUI();
+  }
+  document.getElementById('volDown').addEventListener('click',function(e){e.stopPropagation();changeVol(-5)});
+  document.getElementById('volUp').addEventListener('click',function(e){e.stopPropagation();changeVol(5)});
+  syncVolUI();
+  document.addEventListener('click',function(e){if(!p.contains(e.target)&&e.target.id!=='soundBtn')p.classList.remove('show');var lp=document.getElementById('levelPicker');if(lp&&!lp.contains(e.target)&&e.target.id!=='levelBadge')lp.classList.remove('show')});
+})();
+</script>
+<div id="toastMsg" style="display:none;position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:100;background:rgba(0,0,0,.85);color:#fbbf24;padding:8px 20px;border-radius:20px;font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap"></div>
+<div id="comboPop" class="combo-pop" style="display:none"></div>
+</body>
+</html>

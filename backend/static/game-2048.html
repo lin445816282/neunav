@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="2048">
+<link rel="manifest" href="/2048-manifest.json">
+<title>2048</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#faf8ef;min-height:100vh;display:flex;flex-direction:column;align-items:center;color:#333;user-select:none;-webkit-user-select:none;touch-action:manipulation;overflow:hidden}
+.header{width:100%;max-width:420px;padding:12px 16px 4px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:28px;color:#776e65;margin:0}
+.header .scores{display:flex;gap:6px}
+.score-box{background:#bbada0;color:#fff;border-radius:6px;padding:6px 12px;text-align:center;min-width:60px}
+.score-box .label{font-size:10px;text-transform:uppercase;opacity:.7}
+.score-box .val{font-size:24px;font-weight:700;transition:color .2s}
+.score-box.best-beat .val{animation:bestGlow .6s ease}
+@keyframes bestGlow{0%,100%{color:#fff}50%{color:#fc0;text-shadow:0 0 12px #fc0}}
+.game-area{flex:1;width:100%;max-width:420px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+#grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px;background:linear-gradient(135deg,#b8a99a,#bbada0,#c2b2a3);border-radius:12px;width:100%;max-width:340px;aspect-ratio:1;touch-action:none}
+.cell{aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#776e65;background:#cdc1b4;transition:all .12s ease}
+.cell[data-v="0"]{background:#cdc1b4;color:transparent;box-shadow:inset 0 2px 4px rgba(0,0,0,.06);}
+.cell:not([data-v="0"]){box-shadow:0 3px 6px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.08)}
+.cell.new-tile{animation:tileIn .25s ease}
+@keyframes tileIn{0%{transform:scale(0);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+.cell.new{animation:pop .2s ease}
+.cell.merged{animation:merge .2s ease}
+@keyframes pop{0%{transform:scale(0)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes merge{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.grid-shake{animation:shake .3s ease}
+#goal-text{font-size:12px;color:#f65e3b;text-align:center;margin-top:6px;font-weight:600;opacity:0;transition:opacity .3s}
+#goal-text.show{opacity:1}
+@keyframes scoreBounce{0%{transform:scale(1)}50%{transform:scale(1.4);color:#f65e3b}100%{transform:scale(1)}}
+.score-pop{animation:scoreBounce .3s ease}
+/* Merge float */
+.float-score{position:absolute;font-size:18px;font-weight:800;color:#f65e3b;pointer-events:none;z-index:5;animation:floatUp .8s ease forwards}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-48px) scale(1.3)}}
+.cell[data-v="2"]{background:#eee4da}
+.cell[data-v="4"]{background:#ede0c8}
+.cell[data-v="8"]{background:#f2b179;color:#fff}
+.cell[data-v="16"]{background:#f59563;color:#fff}
+.cell[data-v="32"]{background:#f67c5f;color:#fff}
+.cell[data-v="64"]{background:#f65e3b;color:#fff}
+.cell[data-v="128"]{background:#edcf72;color:#fff;font-size:24px}
+.cell[data-v="256"]{background:#edcc61;color:#fff;font-size:24px}
+.cell[data-v="512"]{background:#edc850;color:#fff;font-size:24px}
+.cell[data-v="1024"]{background:#edc53f;color:#fff;font-size:20px}
+.cell[data-v="2048"]{background:#edc22e;color:#fff;font-size:20px}
+.cell[data-v="4096"]{background:#3c3a32;color:#fff;font-size:18px}
+.cell[data-v="8192"]{background:#1a472a;color:#fc0;font-size:18px}
+.cell[data-v="16384"]{background:#0b3d5c;color:#0ff;font-size:16px}
+.cell[data-v="32768"]{background:#4a0e4e;color:#f0f;font-size:16px}
+.cell[data-v="65536"]{background:#8b0000;color:#ff0;font-size:14px}
+/* Dark mode */
+body.dark{background:#1a1a2e}
+body.dark .header h1{color:#eee}
+body.dark .btn-outline{color:#ccc;border-color:#555}
+body.dark .btn-gray{background:rgba(255,255,255,.06);color:#aaa}
+body.dark .footer{color:#666}
+body.dark #grid{background:linear-gradient(135deg,#2a2a3e,#1e1e30,#2d2d3e)}
+body.dark .overlay{background:rgba(10,10,30,.85)}
+/** Dark mode grid */
+body.dark .overlay h2,body.dark .overlay p{color:#eee}
+/* Combo */
+#combo-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#fc0;text-shadow:0 2px 8px rgba(255,204,0,.6);pointer-events:none;z-index:5;opacity:0;transition:opacity .15s}
+#combo-text.show{opacity:1;animation:comboPop .6s ease forwards}
+@keyframes comboPop{0%{transform:translate(-50%,-50%) scale(.5);opacity:0}30%{transform:translate(-50%,-50%) scale(1.3);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+/* Particles */
+.particle{position:absolute;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:6;animation:particleFly .6s ease forwards}
+@keyframes particleFly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(0)}}
+/* Stats panel */
+#stats-panel{position:fixed;inset:0;background:rgba(238,228,218,.92);z-index:15;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+#stats-panel.show{display:flex;animation:fadeIn .3s ease}
+#stats-panel .stat-row{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+#stats-panel .stat-item{text-align:center;min-width:60px}
+#stats-panel .stat-item .sv{font-size:28px;font-weight:700;color:#776e65}
+#stats-panel .stat-item .sl{font-size:10px;color:#aaa;text-transform:uppercase}
+#stats-panel h3{font-size:18px;color:#776e65;margin:0}
+#stats-panel .btn{flex:none;width:120px;align-self:center;background:rgba(0,0,0,.06);color:#776e65}
+/* Achievement toast */
+.achieve-toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#fc0,#f90);color:#333;padding:10px 24px;border-radius:24px;font-weight:700;font-size:14px;z-index:25;opacity:0;transition:all .3s;pointer-events:none;box-shadow:0 4px 16px rgba(255,204,0,.4)}
+.achieve-toast.show{opacity:1;animation:achieveIn .5s ease}
+@keyframes achieveIn{0%{transform:translateX(-50%) translateY(-20px);opacity:0}100%{transform:translateX(-50%) translateY(0);opacity:1}}
+/* Share button in overlay */
+.overlay .btn-sm{flex:none;max-width:80px;font-size:12px;padding:8px 12px;background:rgba(0,0,0,.06);color:#666;border-radius:20px;border:none;cursor:pointer;margin-top:8px}
+/* Dark mode toggle */
+#darkToggle{position:fixed;top:8px;right:8px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,.08);font-size:16px;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center}
+body.dark #darkToggle{background:rgba(255,255,255,.1)}
+/* Toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.bottom-bar{width:100%;max-width:420px;padding:10px 16px 52px;display:flex;gap:8px;justify-content:center}
+.btn{flex:1;max-width:120px;padding:10px 8px;border:none;border-radius:22px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn:active{transform:scale(.94)}
+.btn-yellow{background:#edc22e;color:#fff}
+.btn-outline{background:transparent;color:#776e65;border:2px solid #bbada0}
+.btn-gray{background:rgba(0,0,0,.06);color:#888;font-size:13px}
+.btn:disabled{opacity:.35;pointer-events:none}
+.btn-dim{opacity:.35}
+.footer{font-size:10px;color:#aaa;padding:4px 8px 16px;text-align:center}
+.overlay{display:none;position:fixed;inset:0;background:rgba(238,228,218,.75);z-index:10;justify-content:center;align-items:center;flex-direction:column;gap:16px}
+.overlay.show{display:flex;animation:fadeIn .3s ease}
+.overlay.show .btn{animation:popIn .35s ease .1s both}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.overlay h2{font-size:32px;color:#776e65}
+.overlay p{font-size:16px;color:#776e65}
+</style>
+</head>
+<body>
+
+<button id="darkToggle" title="深色模式">🌙</button>
+
+<div class="header">
+  <h1>2048</h1>
+  <div class="scores">
+    <div class="score-box">
+      <div class="label">分数</div>
+      <div class="val" id="score">0</div>
+    </div>
+    <div class="score-box">
+      <div class="label">最高</div>
+      <div class="val" id="best">0</div>
+    </div>
+    <div class="score-box">
+      <div class="label">步数</div>
+      <div class="val" id="moves" style="font-size:20px">0</div>
+    </div>
+  </div>
+</div>
+
+<div class="game-area" id="gameArea">
+  <div id="grid"></div>
+  <div id="combo-text"></div>
+  <div id="goal-text"></div>
+  <div id="hint-text" style="text-align:center;color:#aaa;font-size:12px;margin-top:8px;line-height:1.8;transition:opacity .4s">
+    👆 在数字区域<b>滑动</b>操作<br>
+    <span style="font-size:11px;color:#ccc">← 键盘方向键 | 手机屏幕滑动</span>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-outline btn-dim" id="btnUndo">↩ 撤销</button>
+  <button class="btn btn-yellow" id="btnRestart">🔄 新游戏</button>
+  <button class="btn btn-gray" id="btnBack">🏠</button>
+</div>
+
+<div class="footer">滑动合并数字 · 挑战2048</div>
+
+<div id="toast" class="toast"></div>
+
+<div class="overlay" id="overlay">
+  <h2 id="overlayTitle"></h2>
+  <p id="overlayMsg"></p>
+  <button class="btn btn-yellow" id="overlayBtn"></button>
+  <button class="btn-sm" id="shareBtn" style="display:none">📤 分享</button>
+</div>
+
+<div id="stats-panel">
+  <h3>📊 游戏统计</h3>
+  <div class="stat-row">
+    <div class="stat-item"><div class="sv" id="statGames">0</div><div class="sl">总局数</div></div>
+    <div class="stat-item"><div class="sv" id="statWins">0</div><div class="sl">胜利</div></div>
+    <div class="stat-item"><div class="sv" id="statBest">0</div><div class="sl">最高方块</div></div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-item"><div class="sv" id="statAvg">0</div><div class="sl">平均分</div></div>
+    <div class="stat-item"><div class="sv" id="statRate">-</div><div class="sl">胜率</div></div>
+    <div class="stat-item"><div class="sv" id="statTime">0:00</div><div class="sl">游戏时长</div></div>
+  </div>
+  <button class="btn" id="statsClose" style="margin-top:12px">关闭</button>
+</div>
+
+<div id="achieve-toast" class="achieve-toast"></div>
+
+<script>
+// ═══════════ State ═══════════
+let grid = [], score = 0, prevScore = 0, best = 0, undoStack = [], won = false, mergeScores = [], moveCount = 0, newTilePos = null;
+const SIZE = 4, UNDO_MAX = 3;
+
+// ═══════════ DOM ═══════════
+const gridEl = document.getElementById('grid');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const movesEl = document.getElementById('moves');
+const btnUndo = document.getElementById('btnUndo');
+const overlay = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlayMsg = document.getElementById('overlayMsg');
+const overlayBtn = document.getElementById('overlayBtn');
+const hintText = document.getElementById('hint-text');
+const goalText = document.getElementById('goal-text');
+const bestBox = bestEl.parentElement;
+const comboText = document.getElementById('combo-text');
+const darkToggle = document.getElementById('darkToggle');
+const toast = document.getElementById('toast');
+
+// ═══════════ Audio ═══════════
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playMerge() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type = 'sine'; o.frequency.value = 520 + Math.random() * 200;
+  g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  o.start(); o.stop(audioCtx.currentTime + 0.15);
+}
+function playGameOver() {
+  if (!audioCtx) return;
+  [300, 250, 200].forEach((freq, i) => {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'triangle'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.1, audioCtx.currentTime + i * 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.12 + 0.2);
+    o.start(audioCtx.currentTime + i * 0.12);
+    o.stop(audioCtx.currentTime + i * 0.12 + 0.2);
+  });
+}
+
+// ═══════════ Stats ═══════════
+let stats = {games:0,wins:0,bestTile:0,totalScore:0,totalMoves:0};
+function loadStats() {
+  try { const s = JSON.parse(localStorage.getItem('_2048stats')); if (s) Object.assign(stats, s); } catch(e) {}
+}
+function saveStats() { localStorage.setItem('_2048stats', JSON.stringify(stats)); }
+function updateStats() {
+  stats.games++;
+  if (won) stats.wins++;
+  stats.totalScore += score;
+  stats.totalMoves += moveCount;
+  const maxTile = Math.max(...grid.flat());
+  if (maxTile > stats.bestTile) stats.bestTile = maxTile;
+  saveStats();
+  renderStats();
+}
+function renderStats() {
+  document.getElementById('statGames').textContent = stats.games;
+  document.getElementById('statWins').textContent = stats.wins;
+  document.getElementById('statBest').textContent = stats.bestTile;
+  document.getElementById('statAvg').textContent = stats.games ? Math.round(stats.totalScore / stats.games) : 0;
+  document.getElementById('statRate').textContent = stats.games ? Math.round(stats.wins / stats.games * 100) + '%' : '-';
+}
+
+// ═══════════ Achievements ═══════════
+let achievements = [];
+function loadAchievements() {
+  try { achievements = JSON.parse(localStorage.getItem('_2048achieve')) || []; } catch(e) {}
+}
+function saveAchievements() { localStorage.setItem('_2048achieve', JSON.stringify(achievements)); }
+function checkAchievements() {
+  const maxTile = Math.max(...grid.flat());
+  const checks = [
+    {id:'tile128', cond:maxTile>=128, msg:'🎖 首次达成 128！'},
+    {id:'tile256', cond:maxTile>=256, msg:'🎖 首次达成 256！'},
+    {id:'tile512', cond:maxTile>=512, msg:'🏅 首次达成 512！'},
+    {id:'tile1024', cond:maxTile>=1024, msg:'🏆 首次达成 1024！'},
+    {id:'tile2048', cond:maxTile>=2048, msg:'👑 首次达成 2048！'},
+    {id:'tile4096', cond:maxTile>=4096, msg:'🌟 首次达成 4096！'},
+    {id:'moves100', cond:moveCount>=100, msg:'💪 100步达成！'},
+    {id:'score5000', cond:score>=5000, msg:'🔥 分数突破 5000！'},
+    {id:'score20000', cond:score>=20000, msg:'🚀 分数突破 20000！'},
+  ];
+  checks.forEach(c => {
+    if (c.cond && !achievements.includes(c.id)) {
+      achievements.push(c.id);
+      saveAchievements();
+      showAchievement(c.msg);
+    }
+  });
+}
+let achieveTimer;
+function showAchievement(msg) {
+  const el = document.getElementById('achieve-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(achieveTimer);
+  achieveTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════ Share ═══════════
+const shareBtn = document.getElementById('shareBtn');
+shareBtn.addEventListener('click', () => {
+  const maxTile = Math.max(...grid.flat());
+  const text = `🎮 2048 | 得分:${score} | 最高方块:${maxTile} | ${moveCount}步 | ct256.cn`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('已复制分享文字'));
+  } else {
+    showToast(text);
+  }
+});
+
+// ═══════════ Particle burst ═══════════
+function spawnParticles(r, c, val) {
+  const idx = r * SIZE + c;
+  const cell = gridEl.children[idx];
+  if (!cell) return;
+  const rect = cell.getBoundingClientRect();
+  const areaRect = gameArea.getBoundingClientRect();
+  const cx = rect.left - areaRect.left + rect.width / 2;
+  const cy = rect.top - areaRect.top + rect.height / 2;
+  const colors = ['#edc22e','#fc0','#f65e3b','#f2b179','#fff'];
+  const count = Math.min(12, Math.floor(Math.log2(val)));
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.setProperty('--px', (Math.random() - 0.5) * 80 + 'px');
+    p.style.setProperty('--py', (Math.random() - 0.5) * 80 + 'px');
+    gameArea.appendChild(p);
+    setTimeout(() => p.remove(), 600);
+  }
+}
+
+// ═══════════ Timer ═══════════
+let gameStart = Date.now(), timerInterval;
+function startTimer() {
+  gameStart = Date.now();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - gameStart) / 1000);
+    document.getElementById('statTime').textContent = 
+      Math.floor(elapsed / 60) + ':' + String(elapsed % 60).padStart(2, '0');
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); }
+
+// ═══════════ Dynamic goal ═══════════
+function updateGoal() {
+  const maxTile = Math.max(...grid.flat());
+  let next;
+  if (maxTile < 128) next = 128;
+  else if (maxTile < 256) next = 256;
+  else if (maxTile < 512) next = 512;
+  else if (maxTile < 1024) next = 1024;
+  else if (maxTile < 2048) next = 2048;
+  else if (maxTile < 4096) next = 4096;
+  else if (maxTile < 8192) next = 8192;
+  else if (maxTile < 16384) next = 16384;
+  else next = maxTile * 2;
+  if (maxTile >= 128) {
+    goalText.textContent = (won ? '🔥 ' : '🎯 ') + '冲刺 ' + next + '！';
+    goalText.classList.add('show');
+  }
+}
+
+// Page title
+function updateTitle() {
+  document.title = score > 0 ? '2048 · ' + score + '分' : '2048';
+}
+
+// Stats panel
+document.getElementById('statsClose').addEventListener('click', () => {
+  document.getElementById('stats-panel').classList.remove('show');
+});
+bestBox.addEventListener('click', () => {
+  renderStats();
+  document.getElementById('stats-panel').classList.add('show');
+});
+bestBox.style.cursor = 'pointer';
+bestBox.title = '点击查看统计';
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+// ═══════════ Dark mode ═══════════
+if (localStorage.getItem('_2048dark') === '1') {
+  document.body.classList.add('dark');
+  darkToggle.textContent = '☀️';
+}
+darkToggle.addEventListener('click', () => {
+  const isDark = document.body.classList.toggle('dark');
+  darkToggle.textContent = isDark ? '☀️' : '🌙';
+  localStorage.setItem('_2048dark', isDark ? '1' : '0');
+});
+
+// ═══════════ Auto-save ═══════════
+function saveGame() {
+  if (score === 0 && moveCount === 0) return;
+  localStorage.setItem('_2048save', JSON.stringify({
+    grid, score, moveCount, undoStack, won
+  }));
+}
+function loadGame() {
+  const raw = localStorage.getItem('_2048save');
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    grid = data.grid; score = data.score;
+    moveCount = data.moveCount || 0;
+    undoStack = data.undoStack || [];
+    won = data.won || false;
+    mergeScores = []; newTilePos = null;
+    movesEl.textContent = moveCount;
+    btnUndo.classList.remove('btn-dim');
+    btnUndo.textContent = undoStack.length ? `↩ 撤销 (${undoStack.length})` : '↩ 撤销';
+    if (undoStack.length === 0) btnUndo.classList.add('btn-dim');
+    hintText.style.opacity = moveCount > 0 ? '0' : '1';
+    render();
+    updateTitle();
+    localStorage.removeItem('_2048save');
+    return true;
+  } catch (e) { return false; }
+}
+
+// ═══════════ Init ═══════════
+best = parseInt(localStorage.getItem('_2048best')) || 0;
+bestEl.textContent = best;
+loadStats();
+loadAchievements();
+renderStats();
+
+// Try restore saved game
+const restored = loadGame();
+if (restored) {
+  showToast('📂 恢复了上次进度');
+  startTimer();
+} else {
+  newGame();
+}
+
+// Init audio on first user interaction
+document.addEventListener('touchstart', initAudio, {once: true});
+document.addEventListener('keydown', initAudio, {once: true});
+
+// Stats button: long-press best score
+bestBox.addEventListener('click', () => {
+  document.getElementById('stats-panel').classList.add('show');
+});
+bestBox.style.cursor = 'pointer';
+bestBox.title = '点击查看统计';
+
+function emptyGrid() {
+  return Array.from({length: SIZE}, () => Array(SIZE).fill(0));
+}
+
+function addTile(g) {
+  const empty = [];
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (g[r][c] === 0) empty.push([r, c]);
+  if (!empty.length) return;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  g[r][c] = Math.random() < 0.9 ? 2 : 4;
+  newTilePos = {r, c};
+}
+
+function saveUndo() {
+  undoStack.push(grid.map(r => [...r]));
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  btnUndo.classList.remove('btn-dim');
+  btnUndo.textContent = `↩ 撤销 (${undoStack.length})`;
+}
+
+function newGame() {
+  grid = emptyGrid();
+  score = 0;
+  prevScore = 0;
+  moveCount = 0;
+  undoStack = [];
+  mergeScores = [];
+  won = false;
+  newTilePos = null;
+  btnUndo.classList.add('btn-dim');
+  btnUndo.textContent = '↩ 撤销';
+  movesEl.textContent = '0';
+  hintText.style.opacity = '1';
+  goalText.classList.remove('show');
+  goalText.textContent = '';
+  bestBox.classList.remove('best-beat');
+  localStorage.removeItem('_2048save');
+  addTile(grid);
+  addTile(grid);
+  render();
+  overlay.classList.remove('show');
+  shareBtn.style.display = 'none';
+  startTimer();
+  updateTitle();
+  // Remove cancel button if present
+  const cancelBtn = document.getElementById('overlayCancel');
+  if (cancelBtn) cancelBtn.remove();
+}
+
+// ═══════════ Move logic ═══════════
+function slide(row, rowIdx, colBase, isCol) {
+  let arr = row.filter(v => v !== 0);
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] === arr[i + 1]) {
+      arr[i] *= 2;
+      score += arr[i];
+      // Record merge position for float animation
+      const gridR = isCol ? i : rowIdx;
+      const gridC = isCol ? rowIdx : i;
+      mergeScores.push({r: gridR, c: gridC, val: arr[i]});
+      arr.splice(i + 1, 1);
+    }
+  }
+  while (arr.length < SIZE) arr.push(0);
+  return arr;
+}
+
+function move(dir) {
+  const old = grid.map(r => [...r]);
+  let moved = false;
+  mergeScores = [];
+
+  for (let r = 0; r < SIZE; r++) {
+    let row;
+    if (dir === 0) { // left
+      row = [...grid[r]];
+      grid[r] = slide(row, r, 0, false);
+    } else if (dir === 1) { // right
+      row = [...grid[r]].reverse();
+      grid[r] = slide(row, r, SIZE - 1, false).reverse();
+    } else if (dir === 2) { // up
+      row = [];
+      for (let c = 0; c < SIZE; c++) row.push(grid[c][r]);
+      const slid = slide(row, r, 0, true);
+      for (let c = 0; c < SIZE; c++) grid[c][r] = slid[c];
+    } else { // down
+      row = [];
+      for (let c = SIZE - 1; c >= 0; c--) row.push(grid[c][r]);
+      const slid = slide(row, r, SIZE - 1, true).reverse();
+      for (let c = 0; c < SIZE; c++) grid[c][r] = slid[c];
+    }
+  }
+
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] !== old[r][c]) moved = true;
+
+  if (moved) {
+    moveCount++;
+    movesEl.textContent = moveCount;
+    hintText.style.opacity = '0';
+    saveUndo();
+    addTile(grid);
+    
+    // Combo + particles on big merges
+    const mergeCount = mergeScores.length;
+    if (mergeCount >= 3) {
+      comboText.textContent = `COMBO x${mergeCount}!`;
+      comboText.classList.add('show');
+      setTimeout(() => comboText.classList.remove('show'), 600);
+    }
+    // Spawn particles for merges 1024+
+    mergeScores.forEach(({r, c, val}) => {
+      if (val >= 1024) spawnParticles(r, c, val);
+    });
+    
+    render();
+    if (navigator.vibrate) navigator.vibrate(10);
+    if (mergeScores.length > 0) playMerge();
+    saveGame();
+    updateTitle();
+    checkAchievements();
+    updateGoal();
+  } else {
+    // Shake feedback when no move
+    gridEl.classList.add('grid-shake');
+    setTimeout(() => gridEl.classList.remove('grid-shake'), 300);
+  }
+  checkGameOver();
+}
+
+// ═══════════ Undo ═══════════
+function undo() {
+  if (!undoStack.length) { showToast('撤销次数已用完'); return; }
+  grid = undoStack.pop();
+  score = Math.max(0, score - 4);
+  mergeScores = [];
+  if (!undoStack.length) { btnUndo.classList.add('btn-dim'); btnUndo.textContent = '↩ 撤销'; }
+  else btnUndo.textContent = `↩ 撤销 (${undoStack.length})`;
+  render();
+  updateTitle();
+}
+
+// ═══════════ Check ═══════════
+function checkGameOver() {
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c] === 0) return;
+      if (c < SIZE - 1 && grid[r][c] === grid[r][c + 1]) return;
+      if (r < SIZE - 1 && grid[r][c] === grid[r + 1][c]) return;
+    }
+  const maxTile = Math.max(...grid.flat());
+  stopTimer();
+  updateStats();
+  localStorage.removeItem('_2048save');
+  playGameOver();
+  showOverlay('游戏结束', `得分：${score} ｜ 最高方块：${maxTile} ｜ ${moveCount}步`, '再来一局', () => { shareBtn.style.display = 'none'; newGame(); });
+  shareBtn.style.display = 'inline-block';
+  // Add undo-as-continue option
+  if (undoStack.length > 0) {
+    const contBtn = document.createElement('button');
+    contBtn.className = 'btn-sm';
+    contBtn.textContent = '↩ 悔棋挽回';
+    contBtn.style.marginTop = '8px';
+    contBtn.onclick = () => {
+      overlay.classList.remove('show');
+      shareBtn.style.display = 'none';
+      undo();
+      startTimer();
+    };
+    overlayBtn.after(contBtn);
+  }
+}
+
+function checkWin() {
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] >= 2048 && !won) {
+        won = true;
+        showOverlay('🎉 恭喜！', `达到 2048！得分：${score}`, '继续挑战', () => { overlay.classList.remove('show'); render(); });
+        return;
+      }
+}
+
+function showOverlay(title, msg, btnText, cb) {
+  // Clean up extra buttons from previous overlay
+  shareBtn.style.display = 'none';
+  document.querySelectorAll('#overlay .btn-sm:not(#shareBtn)').forEach(b => b.remove());
+  overlayTitle.textContent = title;
+  overlayMsg.textContent = msg;
+  overlayBtn.textContent = btnText;
+  overlayBtn.onclick = cb;
+  overlay.classList.add('show');
+}
+
+// ═══════════ Render ═══════════
+function render() {
+  // Clear old floats
+  document.querySelectorAll('.float-score').forEach(el => el.remove());
+
+  const scoreChanged = score !== prevScore;
+  prevScore = score;
+  scoreEl.textContent = score;
+  if (scoreChanged && score > 0) {
+    scoreEl.classList.remove('score-pop');
+    void scoreEl.offsetWidth;
+    scoreEl.classList.add('score-pop');
+  }
+  // Best beat — check BEFORE updating best
+  const beatBest = score > best;
+  if (beatBest) {
+    best = score;
+    localStorage.setItem('_2048best', best);
+    bestEl.textContent = best;
+    bestBox.classList.add('best-beat');
+    setTimeout(() => bestBox.classList.remove('best-beat'), 600);
+  }
+  gridEl.innerHTML = '';
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.v = grid[r][c];
+      cell.textContent = grid[r][c] || '';
+      gridEl.appendChild(cell);
+    }
+
+  // Float scores on merges
+  mergeScores.forEach(({r, c, val}) => {
+    const idx = r * SIZE + c;
+    const cell = gridEl.children[idx];
+    if (!cell) return;
+    const rect = cell.getBoundingClientRect();
+    const areaRect = gameArea.getBoundingClientRect();
+    const float = document.createElement('div');
+    float.className = 'float-score';
+    float.textContent = `+${val}`;
+    float.style.left = (rect.left - areaRect.left + rect.width / 2 - 20) + 'px';
+    float.style.top = (rect.top - areaRect.top - 4) + 'px';
+    gameArea.appendChild(float);
+  });
+  mergeScores = [];
+
+  // Mark new tile
+  if (newTilePos) {
+    const idx = newTilePos.r * SIZE + newTilePos.c;
+    const cell = gridEl.children[idx];
+    if (cell) cell.classList.add('new-tile');
+    newTilePos = null;
+  }
+
+  checkWin();
+}
+
+// ═══════════ Touch ═══════════
+let touchStartX, touchStartY;
+const SWIPE_MIN = 30;
+
+gridEl.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+});
+
+gridEl.addEventListener('touchmove', e => {
+  e.preventDefault(); // 阻止页面滚动
+}, {passive: false});
+
+gridEl.addEventListener('touchend', e => {
+  if (touchStartX == null) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const absDx = Math.abs(dx), absDy = Math.abs(dy);
+  if (Math.max(absDx, absDy) < SWIPE_MIN) return;
+  if (absDx > absDy) move(dx > 0 ? 1 : 0);
+  else move(dy > 0 ? 3 : 2);
+  touchStartX = null;
+});
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  const map = {ArrowLeft:0, ArrowRight:1, ArrowUp:2, ArrowDown:3};
+  if (e.key in map) { e.preventDefault(); move(map[e.key]); }
+});
+
+// ═══════════ Buttons ═══════════
+btnUndo.addEventListener('click', undo);
+document.getElementById('btnRestart').addEventListener('click', () => {
+  if (score > 0 || moveCount > 0) {
+    showOverlay('⚠️ 重新开始？', '当前进度将丢失', '确定', () => newGame());
+    // Add cancel option by modifying overlay to show two buttons
+    overlayBtn.insertAdjacentHTML('afterend', '<button class="btn btn-outline" id="overlayCancel" style="margin-top:8px" onclick="document.getElementById(\'overlay\').classList.remove(\'show\')">取消</button>');
+  } else {
+    newGame();
+  }
+});
+document.getElementById('btnBack').addEventListener('click', () => { location.href = '/nav'; });
+
+// ═══════════ Start ═══════════
+// Game starts via init above (loadGame or newGame)
+</script>
+</body>
+</html>

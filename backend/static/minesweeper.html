@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>扫雷 · Minesweeper</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#e8e0d8;display:flex;justify-content:center;align-items:center;min-height:100dvh;padding:12px;transition:background .3s;overscroll-behavior:contain}
+.container{max-width:420px;width:100%;margin:0 auto}
+/* ── Header ── */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+.title{font-size:22px;font-weight:800;color:#5c3d2e;transition:color .3s}
+.diff-label{font-size:11px;color:#999;background:rgba(0,0,0,.05);padding:2px 8px;border-radius:10px;white-space:nowrap;transition:all .3s}
+.stats-bar{display:flex;gap:6px;align-items:center}
+.stat-box{min-width:54px;text-align:center;background:rgba(0,0,0,.08);border-radius:8px;padding:4px 8px;transition:all .3s}
+.stat-box .sv{font-size:16px;font-weight:700;color:#5c3d2e;font-variant-numeric:tabular-nums}
+.stat-box .sl{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.5px}
+/* ── Controls ── */
+.controls{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.btn{padding:6px 12px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;background:rgba(0,0,0,.06);color:#555}
+.btn:active{transform:scale(.94)}
+.btn.active{background:#c8a882;color:#fff}
+.btn-sm{padding:4px 10px;font-size:11px;border-radius:6px}
+/* ── Mines-Left highlight ── */
+.mines-left.warning{color:#e74c3c !important}
+/* ── Grid ── */
+.grid-wrap{position:relative;display:flex;justify-content:center}
+#grid{display:grid;gap:2px;border-radius:12px;padding:4px;transition:all .3s;
+  /* 3D beveled border — light top/left, dark bottom/right */
+  border:4px solid;
+  border-color:rgba(255,255,255,.55) rgba(0,0,0,.18) rgba(0,0,0,.22) rgba(255,255,255,.4);
+  background:rgba(0,0,0,.12);
+  box-shadow:2px 2px 8px rgba(0,0,0,.12),inset 0 0 0 1px rgba(0,0,0,.04)}
+.cell{aspect-ratio:1;border:none;border-radius:3px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;outline:none;transition:all .1s;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  text-shadow:0 1px 0 rgba(255,255,255,.3);
+  /* Raised 3D tile */
+  box-shadow:1.5px 1.5px 0 rgba(255,255,255,.35),-1.5px -1.5px 0 rgba(0,0,0,.12),inset 1px 1px 2px rgba(255,255,255,.25),inset -1px -1px 2px rgba(0,0,0,.08)}
+.cell:active:not(.revealed):not(.flagged){transform:scale(.92);filter:brightness(.85);box-shadow:inset 2px 2px 4px rgba(0,0,0,.2)}
+/* Revealed = sunken */
+.cell.revealed{box-shadow:inset 1px 2px 3px rgba(0,0,0,.13)}
+.cell.flagged{box-shadow:1.5px 1.5px 0 rgba(255,255,255,.35),-1.5px -1.5px 0 rgba(0,0,0,.12),inset 1px 1px 2px rgba(255,255,255,.25),inset -1px -1px 2px rgba(0,0,0,.08)}
+.cell.qmark{box-shadow:1.5px 1.5px 0 rgba(255,255,255,.35),-1.5px -1.5px 0 rgba(0,0,0,.12),inset 1px 1px 2px rgba(255,255,255,.25),inset -1px -1px 2px rgba(0,0,0,.08);color:#fc0}
+.cell.mine.revealed{box-shadow:inset 1px 2px 3px rgba(0,0,0,.13)}
+/* Reveal pop animation */
+.cell.reveal-pop{animation:popReveal .12s ease}
+@keyframes popReveal{0%{transform:scale(.6)}70%{transform:scale(1.05)}100%{transform:scale(1)}}
+/* Wrong flag on game over */
+.cell.wrong-flag{background:#e74c3c!important} .cell.wrong-flag::after{content:'❌';font-size:inherit}
+/* Flag mode toggle */
+#btnFlagMode{width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:18px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;background:rgba(0,0,0,.06)}
+#btnFlagMode.flag-on{background:#fc0;box-shadow:0 0 8px rgba(255,204,0,.5)}
+#btnMute{width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;background:rgba(0,0,0,.06)}
+#btnMute.muted{opacity:.5}
+/* Win particles */
+.particles{position:fixed;inset:0;z-index:20;pointer-events:none;overflow:hidden}
+.particle{position:absolute;width:8px;height:8px;border-radius:50%;animation:particleFall 2s ease forwards}
+@keyframes particleFall{0%{opacity:1;transform:translateY(0) rotate(0deg)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
+/* ── Skins ── */
+/* 🟫 Classic Win95 */
+.skin-classic body{background:#e8e0d8}
+.skin-classic .title{color:#5c3d2e}
+.skin-classic .cell{background:#c0c0c0;border:2px outset #ddd;color:#333}
+.skin-classic .cell.revealed{border:1px solid #999;background:#d4d4d4}
+.skin-classic .cell:not(.revealed):not(.flagged):hover{background:#d0d0d0}
+.skin-classic .cell.mine{background:#e74c3c}
+.skin-classic .cell.flagged{background:#c0c0c0}
+.skin-classic .cell.n1{color:#00f}
+.skin-classic .cell.n2{color:#008000}
+.skin-classic .cell.n3{color:#e00}
+.skin-classic .cell.n4{color:#000080}
+.skin-classic .cell.n5{color:#800000}
+.skin-classic .cell.n6{color:#008080}
+.skin-classic .cell.n7{color:#000}
+.skin-classic .cell.n8{color:#888}
+
+/* 🌙 Dark Mode */
+.skin-dark body{background:#1a1a2e}
+.skin-dark .title{color:#e0d4c8}
+.skin-dark .diff-label{color:#888;background:rgba(255,255,255,.06)}
+.skin-dark .stat-box{background:rgba(255,255,255,.06)}
+.skin-dark .stat-box .sv{color:#e0d4c8}
+.skin-dark .stat-box .sl{color:#777}
+.skin-dark .btn{background:rgba(255,255,255,.08);color:#bbb}
+.skin-dark .btn.active{background:#6b5ce7;color:#fff}
+.skin-dark #btnFlagMode{background:rgba(255,255,255,.08);color:#bbb}
+.skin-dark #btnFlagMode.flag-on{background:#6b5ce7;color:#fff;box-shadow:0 0 10px rgba(107,92,231,.5)}
+.skin-dark #btnMute{background:rgba(255,255,255,.08);color:#bbb}
+.skin-dark #grid{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12) rgba(0,0,0,.3) rgba(0,0,0,.35) rgba(255,255,255,.08);box-shadow:2px 2px 8px rgba(0,0,0,.3),inset 0 0 0 1px rgba(255,255,255,.04)}
+.skin-dark .cell{background:#2a2a3e;border:1px solid #444;color:#ccc}
+.skin-dark .cell.revealed{background:#1e1e30;border-color:#333}
+.skin-dark .cell:not(.revealed):not(.flagged):hover{background:#333350}
+.skin-dark .cell.mine{background:#e74c3c}
+.skin-dark .cell.n1{color:#6b5ce7}
+.skin-dark .cell.n2{color:#2ecc71}
+.skin-dark .cell.n3{color:#e74c3c}
+.skin-dark .cell.n4{color:#3498db}
+.skin-dark .cell.n5{color:#e67e22}
+.skin-dark .cell.n6{color:#1abc9c}
+.skin-dark .cell.n7{color:#fff}
+.skin-dark .cell.n8{color:#888}
+
+/* 🌸 Sakura */
+.skin-sakura body{background:#fef0f5}
+.skin-sakura .title{color:#c4728a}
+.skin-sakura .stat-box{background:rgba(196,114,138,.08)}
+.skin-sakura .stat-box .sv{color:#c4728a}
+.skin-sakura .stat-box .sl{color:#d4a0ad}
+.skin-sakura .btn{background:rgba(196,114,138,.1);color:#c4728a}
+.skin-sakura .btn.active{background:#f0c0d0;color:#a0506a}
+.skin-sakura #grid{background:rgba(196,114,138,.12);border-radius:12px}
+.skin-sakura .cell{background:#fff0f5;border:1px solid #f0d0d8;border-radius:4px;color:#b88090}
+.skin-sakura .cell.revealed{background:#fff;border-color:#eed5dc}
+.skin-sakura .cell:not(.revealed):not(.flagged):hover{background:#ffe8f0}
+.skin-sakura .cell.mine{background:#e88aa0}
+.skin-sakura .cell.n1{color:#c4728a}
+.skin-sakura .cell.n2{color:#a0c888}
+.skin-sakura .cell.n3{color:#e06070}
+.skin-sakura .cell.n4{color:#8898cc}
+.skin-sakura .cell.n5{color:#d08050}
+.skin-sakura .cell.n6{color:#70b0a0}
+.skin-sakura .cell.n7{color:#666}
+.skin-sakura .cell.n8{color:#999}
+
+/* 🎮 Retro Arcade */
+.skin-retro body{background:#0a0a2e;font-family:'Courier New',monospace}
+.skin-retro .title{color:#0f0;text-shadow:0 0 8px #0f0;font-family:'Courier New',monospace}
+.skin-retro .stat-box{background:rgba(0,255,0,.08);border:1px solid rgba(0,255,0,.2)}
+.skin-retro .stat-box .sv{color:#0f0;font-family:'Courier New',monospace}
+.skin-retro .stat-box .sl{color:#0a0}
+.skin-retro .btn{background:rgba(0,255,0,.1);color:#0a0;border:1px solid rgba(0,255,0,.2);font-family:'Courier New',monospace}
+.skin-retro .btn.active{background:#080;color:#0f0}
+.skin-retro #grid{background:rgba(0,255,0,.1);border-color:rgba(0,255,0,.3) rgba(0,80,0,.4) rgba(0,40,0,.5) rgba(0,255,0,.2);box-shadow:2px 2px 8px rgba(0,255,0,.1),inset 0 0 0 1px rgba(0,0,0,.2)}
+.skin-retro .cell{background:#0a0a20;border:1px solid #080;color:#0a0;font-family:'Courier New',monospace}
+.skin-retro .cell.revealed{background:#000;border-color:#040}
+.skin-retro .cell:not(.revealed):not(.flagged):hover{background:#0a0a30}
+.skin-retro .cell.mine{background:#400}
+.skin-retro .cell.n1{color:#0ff}
+.skin-retro .cell.n2{color:#0f0}
+.skin-retro .cell.n3{color:#f00}
+.skin-retro .cell.n4{color:#00f}
+.skin-retro .cell.n5{color:#f80}
+.skin-retro .cell.n6{color:#0aa}
+.skin-retro .cell.n7{color:#ff0}
+.skin-retro .cell.n8{color:#888}
+
+/* 🌊 Ocean Blue */
+.skin-ocean body{background:#e8f4f8}
+.skin-ocean .title{color:#2c6e8a}
+.skin-ocean .stat-box{background:rgba(44,110,138,.08)}
+.skin-ocean .stat-box .sv{color:#2c6e8a}
+.skin-ocean .stat-box .sl{color:#7aa8b8}
+.skin-ocean .btn{background:rgba(44,110,138,.08);color:#4a8aaa}
+.skin-ocean .btn.active{background:#4a9ebe;color:#fff}
+.skin-ocean #grid{background:rgba(44,110,138,.1);border-radius:10px}
+.skin-ocean .cell{background:#f0f8fc;border:1px solid #c8dce4;color:#5a8a9a}
+.skin-ocean .cell.revealed{background:#fff;border-color:#d0e4ec}
+.skin-ocean .cell:not(.revealed):not(.flagged):hover{background:#e8f4fa}
+.skin-ocean .cell.mine{background:#4a90b8}
+.skin-ocean .cell.n1{color:#2c6e8a}
+.skin-ocean .cell.n2{color:#3a8868}
+.skin-ocean .cell.n3{color:#c05050}
+.skin-ocean .cell.n4{color:#4058a0}
+.skin-ocean .cell.n5{color:#c87030}
+.skin-ocean .cell.n6{color:#408888}
+.skin-ocean .cell.n7{color:#444}
+.skin-ocean .cell.n8{color:#888}
+
+/* 🍀 Minimalist */
+.skin-minimal body{background:#fafaf8}
+.skin-minimal .title{color:#333}
+.skin-minimal .stat-box{background:rgba(0,0,0,.04);border-radius:6px}
+.skin-minimal .stat-box .sv{color:#333}
+.skin-minimal .stat-box .sl{color:#bbb}
+.skin-minimal .btn{background:rgba(0,0,0,.04);color:#666;border-radius:6px}
+.skin-minimal .btn.active{background:#333;color:#fff}
+.skin-minimal #grid{background:rgba(0,0,0,.06);border-radius:6px}
+.skin-minimal .cell{background:#fff;border:1px solid #eee;border-radius:2px;color:#444}
+.skin-minimal .cell.revealed{background:#f8f8f6;border-color:#e8e8e4;box-shadow:inset 0 1px 2px rgba(0,0,0,.04)}
+.skin-minimal .cell:not(.revealed):not(.flagged):hover{background:#f4f4f0}
+.skin-minimal .cell.mine{background:#333}
+.skin-minimal .cell.flagged{background:#fff}
+.skin-minimal .cell.n1{color:#6b5ce7}
+.skin-minimal .cell.n2{color:#2ecc71}
+.skin-minimal .cell.n3{color:#e74c3c}
+.skin-minimal .cell.n4{color:#3498db}
+.skin-minimal .cell.n5{color:#e67e22}
+.skin-minimal .cell.n6{color:#1abc9c}
+.skin-minimal .cell.n7{color:#333}
+.skin-minimal .cell.n8{color:#bbb}
+
+/* Flag mode indicator */
+#grid.flag-mode .cell:not(.revealed):not(.flagged):not(.qmark){border-color:rgba(255,204,0,.35)}
+.skin-dark #grid.flag-mode .cell:not(.revealed):not(.flagged):not(.qmark){border-color:rgba(255,204,0,.2)}
+/* ── Skin picker ── */
+.skin-picker{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+.skin-dot{width:32px;height:32px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .2s;position:relative;display:flex;align-items:center;justify-content:center;font-size:18px}
+.skin-dot.active{border-color:#555;transform:scale(1.15);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.skin-dot:hover{transform:scale(1.08)}
+/* ── Toast ── */
+#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:20;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+/* ── Game Over overlay ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:15;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.overlay.show{display:flex;animation:fadeIn .3s ease}
+.overlay h2{color:#fff;font-size:28px;margin:0}
+.overlay p{color:#ddd;font-size:14px;text-align:center;margin:0}
+.overlay .overlay-btn{padding:10px 32px;border:none;border-radius:22px;font-size:15px;font-weight:700;cursor:pointer;background:#fc0;color:#333;transition:all .15s}
+.overlay .overlay-btn:active{transform:scale(.94)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+/* ── Stats Panel ── */
+#stats-panel{position:fixed;inset:0;background:rgba(238,228,218,.94);z-index:16;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+#stats-panel.show{display:flex;animation:fadeIn .3s ease}
+#stats-panel h3{font-size:18px;color:#5c3d2e;margin:0}
+#stats-panel .sr{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:92vw;overflow-y:auto}
+#stats-panel .sr .si{text-align:center;min-width:64px;flex-shrink:0}
+#stats-panel .sr .si .sv{font-size:26px;font-weight:700;color:#5c3d2e}
+#stats-panel .sr .si .sl{font-size:10px;color:#999}
+#stats-panel{padding:24px 12px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <span class="title">💣 扫雷</span>
+    <span class="diff-label" id="diffLabel">9×9 · 10💣</span>
+    <div class="stats-bar">
+      <div class="stat-box"><div class="sl">💣 剩余</div><div class="sv" id="minesLeft">10</div></div>
+      <div class="stat-box"><div class="sl">⏱ 时间</div><div class="sv" id="timer">0</div></div>
+      <div class="stat-box" id="bestBox" style="cursor:pointer" title="点击查看统计"><div class="sl">🏆 最佳</div><div class="sv" id="bestTime">-</div></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-sm" data-diff="tiny" id="diffTiny">6×6</button>
+    <button class="btn active btn-sm" data-diff="easy" id="diffEasy">9×9</button>
+    <button class="btn btn-sm" data-diff="medium" id="diffMedium">16×16</button>
+    <button id="btnFlagMode" title="旗子模式" style="margin-left:auto">⛏️</button>
+    <button id="btnMute" title="音效">🔊</button>
+    <button class="btn btn-sm" id="btnNew">🔄 新局</button>
+  </div>
+
+  <div class="grid-wrap" id="gridWrap">
+    <div id="grid"></div>
+  </div>
+
+  <div class="skin-picker" id="skinPicker"></div>
+</div>
+
+<div id="toast"></div>
+<div class="particles" id="particlesContainer"></div>
+<div class="overlay" id="overlay">
+  <h2 id="overlayTitle"></h2>
+  <p id="overlayMsg"></p>
+  <button class="overlay-btn" id="overlayBtn">🔄 再来一局</button>
+</div>
+<div id="stats-panel">
+  <h3 id="statsTitle">📊 游戏统计</h3>
+  <div class="sr" id="statsContent"></div>
+  <button class="btn" id="statsClose" style="margin-top:8px;width:100px">关闭</button>
+</div>
+
+<script>
+// ═══════════ STATE ═══════════
+let ROWS=9, COLS=9, MINES=10;
+let board=[], revealed=[], flagged=[], questionMark=[];
+let gameOver=false, gameWon=false, gameStarted=false;
+let minesRemaining=0, flagCount=0;
+let timerSec=0, timerInterval=null;
+let firstClick=true;
+let currentSkin='classic';
+let longPressTimer=null, touchStartX=0, touchStartY=0;
+let isTouchMove=false;
+let flagMode=false;
+let audioMuted=localStorage.getItem('_ms_muted')==='1';
+
+const DIFFICULTIES={
+  tiny:  {rows:6, cols:6, mines:6},
+  easy:  {rows:9, cols:9, mines:10},
+  medium:{rows:16,cols:16,mines:40}
+};
+
+const SKINS=[
+  {id:'classic', emoji:'🟫', name:'经典'},
+  {id:'dark',    emoji:'🌙', name:'暗黑'},
+  {id:'sakura',  emoji:'🌸', name:'樱花'},
+  {id:'retro',   emoji:'🎮', name:'复古'},
+  {id:'ocean',   emoji:'🌊', name:'海洋'},
+  {id:'minimal', emoji:'🍀', name:'极简'}
+];
+
+// ── Load prefs ──
+try{
+  const s=JSON.parse(localStorage.getItem('_ms_stats')||'{"tiny":0,"easy":0,"medium":0,"wins_tiny":0,"wins_easy":0,"wins_medium":0,"games":0,"streak":0}');
+  window._msStats=s;
+}catch(e){window._msStats={tiny:0,easy:0,medium:0,wins_tiny:0,wins_easy:0,wins_medium:0,games:0,streak:0};}
+let skinId=localStorage.getItem('_ms_skin')||'classic';
+if(SKINS.find(s=>s.id===skinId))currentSkin=skinId;
+
+// ═══════════ DOM ═══════════
+const gridEl=document.getElementById('grid');
+const minesEl=document.getElementById('minesLeft');
+const timerEl=document.getElementById('timer');
+const bestEl=document.getElementById('bestTime');
+const overlay=document.getElementById('overlay');
+const overlayTitle=document.getElementById('overlayTitle');
+const overlayMsg=document.getElementById('overlayMsg');
+const overlayBtn=document.getElementById('overlayBtn');
+const toast=document.getElementById('toast');
+const body=document.body;
+const flagModeBtn=document.getElementById('btnFlagMode');
+const muteBtn=document.getElementById('btnMute');
+const particlesContainer=document.getElementById('particlesContainer');
+
+// ═══════════ AUDIO ═══════════
+let audioCtx=null;
+function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
+function beep(freq,dur=0.08,vol=0.06){
+  if(!audioCtx||audioMuted)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.type='sine';o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+  o.start();o.stop(audioCtx.currentTime+dur);
+}
+function sfxReveal(){beep(600,0.06,0.04);}
+function sfxFlag(){beep(800,0.06,0.05);try{navigator.vibrate?.(15);}catch(_){}}
+function sfxExplosion(){beep(100,0.3,0.15);beep(80,0.4,0.1);try{navigator.vibrate?.(50);}catch(_){}}
+function sfxWin(){[523,659,784,1047].forEach((f,i)=>beep(f,0.15,0.08));try{navigator.vibrate?.([30,50,30,50]);}catch(_){}}
+
+// ═══════════ PARTICLES ═══════════
+function spawnParticles(){
+  const colors=['#fc0','#f90','#f60','#0f0','#0ff','#f0f','#ff0','#fff'];
+  for(let i=0;i<60;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    p.style.left=Math.random()*100+'%';
+    p.style.top=-(Math.random()*40)+'px';
+    p.style.background=colors[Math.floor(Math.random()*colors.length)];
+    p.style.width=(4+Math.random()*10)+'px';
+    p.style.height=p.style.width;
+    p.style.animationDelay=Math.random()*1.5+'s';
+    p.style.animationDuration=(1.5+Math.random()*2)+'s';
+    particlesContainer.appendChild(p);
+  }
+  setTimeout(()=>{particlesContainer.innerHTML='';},3500);
+}
+
+// ═══════════ BOARD ═══════════
+function initBoard(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  revealed=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  flagged=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  questionMark=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  gameOver=false;gameWon=false;gameStarted=false;firstClick=true;
+  minesRemaining=MINES;flagCount=0;
+  stopTimer();timerSec=0;timerEl.textContent='0';
+  minesEl.textContent=minesRemaining;
+  minesEl.classList.remove('warning');
+  document.getElementById('gridWrap').style.filter='';
+  // Reset flag mode
+  flagMode=false;flagModeBtn.textContent='⛏️';flagModeBtn.classList.remove('flag-on');
+  gridEl.classList.remove('flag-mode');
+}
+
+function placeMines(safeR,safeC){
+  const safe=new Set();
+  safe.add(safeR*COLS+safeC);
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+    const nr=safeR+dr,nc=safeC+dc;
+    if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS)safe.add(nr*COLS+nc);
+  }
+  let placed=0;
+  while(placed<MINES){
+    const r=Math.floor(Math.random()*ROWS),c=Math.floor(Math.random()*COLS);
+    if(safe.has(r*COLS+c)||board[r][c]===-1)continue;
+    board[r][c]=-1;placed++;
+  }
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(board[r][c]===-1)continue;
+    let cnt=0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===-1)cnt++;
+    }
+    board[r][c]=cnt;
+  }
+}
+
+function reveal(r,c){
+  if(r<0||r>=ROWS||c<0||c>=COLS)return;
+  if(revealed[r][c]||flagged[r][c]||gameOver)return;
+  // Allow revealing question-marked cells (clear the mark)
+  if(questionMark[r][c]){questionMark[r][c]=false;}
+  initAudio();
+  revealed[r][c]=true;
+  const cell=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  cell.classList.add('reveal-pop');
+  if(board[r][c]===-1){
+    cell.classList.add('mine');
+    cell.textContent='💣';
+    sfxExplosion();
+    endGame(false);
+    return;
+  }
+  cell.classList.add('revealed');
+  if(board[r][c]>0){
+    cell.textContent=board[r][c];
+    cell.classList.add('n'+board[r][c]);
+    sfxReveal();
+  }else{
+    cell.textContent='';
+    sfxReveal();
+    // flood fill
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      if(dr||dc)reveal(r+dr,c+dc);
+    }
+  }
+  checkWin();
+}
+
+function toggleFlag(r,c){
+  if(revealed[r][c]||gameOver)return;
+  initAudio();
+  const cell=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  // Cycle: none → 🚩 → ❓ → none
+  if(!flagged[r][c] && !questionMark[r][c]){
+    // → flag
+    flagged[r][c]=true;questionMark[r][c]=false;flagCount++;
+    cell.classList.add('flagged');cell.classList.remove('qmark');cell.textContent='🚩';
+    sfxFlag();
+  }else if(flagged[r][c]){
+    // → question mark
+    flagged[r][c]=false;questionMark[r][c]=true;flagCount--;
+    cell.classList.remove('flagged');cell.classList.add('qmark');cell.textContent='❓';
+    sfxFlag();
+  }else{
+    // → clear
+    questionMark[r][c]=false;
+    cell.classList.remove('qmark');cell.textContent='';
+  }
+  minesEl.textContent=MINES-flagCount;
+  minesEl.classList.toggle('warning',MINES-flagCount<0);
+}
+
+function checkWin(){
+  let allRevealed=true;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(board[r][c]===-1)continue;
+    if(!revealed[r][c]){allRevealed=false;break;}
+  }
+  if(allRevealed)endGame(true);
+}
+
+function endGame(won){
+  gameOver=true;stopTimer();
+  const diffKey=Object.entries(DIFFICULTIES).find(([,v])=>v.rows===ROWS&&v.cols===COLS&&v.mines===MINES)?.[0]||'easy';
+  // Update global stats
+  window._msStats.games=(window._msStats.games||0)+1;
+  if(won){
+    gameWon=true;
+    window._msStats.streak=(window._msStats.streak||0)+1;
+    overlayTitle.textContent='🎉 你赢了！';
+    overlayMsg.textContent=`${timerSec} 秒完成 · ${diffKey}`;
+    // save best time
+    window._msStats['wins_'+diffKey]=(window._msStats['wins_'+diffKey]||0)+1;
+    if(!window._msStats[diffKey]||timerSec<window._msStats[diffKey]){
+      window._msStats[diffKey]=timerSec;
+    }
+    localStorage.setItem('_ms_stats',JSON.stringify(window._msStats));
+    updateBest();
+    // Auto-flag remaining mines
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(board[r][c]===-1&&!flagged[r][c]){
+        flagged[r][c]=true;flagCount++;
+        const cell=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+        if(cell){cell.classList.add('flagged');cell.textContent='🚩';}
+      }
+    }
+    minesEl.textContent=MINES-flagCount;
+    // Win effects
+    sfxWin();
+    spawnParticles();
+  }else{
+    window._msStats.streak=0;
+    overlayTitle.textContent='💥 踩雷了！';
+    overlayMsg.textContent='';
+    document.getElementById('gridWrap').style.filter='brightness(0.7) saturate(0.5)';
+    // Reveal all mines + mark wrong flags
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      const cell=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+      if(!cell)continue;
+      if(board[r][c]===-1){
+        if(!flagged[r][c]){cell.classList.add('revealed','mine');cell.textContent='💣';}
+      }else if(flagged[r][c]){
+        // Wrong flag!
+        cell.classList.add('wrong-flag');
+      }
+    }
+    localStorage.setItem('_ms_stats',JSON.stringify(window._msStats));
+  }
+  // Reset new-game button if in confirm state
+  clearTimeout(confirmNewTimeout);
+  const nb=document.getElementById('btnNew');
+  nb.textContent='🔄 新局';nb.style.background='';nb.style.color='';
+  overlay.classList.add('show');
+}
+
+// ═══════════ RENDER ═══════════
+function renderGrid(){
+  gridEl.innerHTML='';
+  gridEl.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
+  gridEl.style.gridTemplateRows=`repeat(${ROWS},1fr)`;
+  // ── calc cell size: always fit width, allow vertical scroll ──
+  const wrap=document.getElementById('gridWrap');
+  const gap=2;
+  const pad=12; // padding+border total
+  const availW=wrap.clientWidth-pad-(COLS-1)*gap;
+  let cellSz=Math.floor(availW/COLS);
+  cellSz=Math.max(cellSz,16); // floor: 16px — still tappable
+  cellSz=Math.min(cellSz,44); // ceiling
+  const boardW=cellSz*COLS+(COLS-1)*gap+pad;
+  const boardH=cellSz*ROWS+(ROWS-1)*gap+pad;
+  const maxH=Math.min(window.innerHeight*0.62,boardH);
+  // ── apply ──
+  gridEl.style.width=boardW+'px';
+  gridEl.style.minWidth='';
+  gridEl.style.maxWidth=boardW+'px';
+  wrap.style.overflowX='hidden';
+  wrap.style.overflowY=boardH>maxH?'auto':'hidden';
+  wrap.style.maxHeight=(maxH+4)+'px';
+  wrap.style.webkitOverflowScrolling='touch';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const div=document.createElement('div');
+    div.classList.add('cell');
+    div.dataset.r=r;div.dataset.c=c;
+    div.style.width=cellSz+'px';div.style.height=cellSz+'px';
+    div.style.fontSize=Math.max(10,cellSz*0.4)+'px';
+    if(revealed[r][c]){
+      div.classList.add('revealed');
+      if(board[r][c]===-1){div.classList.add('mine');div.textContent='💣';}
+      else if(board[r][c]>0){div.textContent=board[r][c];div.classList.add('n'+board[r][c]);}
+    }else if(flagged[r][c]){
+      div.classList.add('flagged');div.textContent='🚩';
+    }else if(questionMark[r][c]){
+      div.classList.add('qmark');div.textContent='❓';
+    }
+    // click handler
+    div.addEventListener('click',e=>{
+      e.preventDefault();
+      if(gameOver)return;
+      if(revealed[r][c]){
+        if(board[r][c]>0)showToast('💡 数字='+board[r][c]+'周围雷数 | 双击快速挖开相邻格');
+        return;
+      }
+      if(flagMode){
+        if(!gameStarted){gameStarted=true;firstClick=false;startTimer();}
+        toggleFlag(r,c);
+        return;
+      }
+      if(flagged[r][c])return;
+      if(firstClick){
+        // Guarantee ≥5 cells revealed
+        let attempts=0;
+        do{
+          initBoard();
+          placeMines(r,c);
+          // Simulate reveal without rendering to count
+          const testRevealed=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+          function testReveal(rr,cc){
+            if(rr<0||rr>=ROWS||cc<0||cc>=COLS||testRevealed[rr][cc]||board[rr][cc]===-1)return;
+            testRevealed[rr][cc]=true;
+            if(board[rr][cc]===0)for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc)testReveal(rr+dr,cc+dc);
+          }
+          testReveal(r,c);
+          const count=testRevealed.flat().filter(Boolean).length;
+          if(count>=5||attempts++>10)break;
+        }while(true);
+        firstClick=false;gameStarted=true;
+        startTimer();
+      }
+      if(!gameStarted){gameStarted=true;startTimer();}
+      reveal(r,c);
+    });
+    // dblclick → chord on revealed numbered cells
+    div.addEventListener('dblclick',e=>{
+      e.preventDefault();
+      if(gameOver||!revealed[r][c]||board[r][c]<=0)return;
+      let adjFlags=0;
+      for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+        const nr=r+dr,nc=c+dc;
+        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&flagged[nr][nc])adjFlags++;
+      }
+      if(adjFlags===board[r][c]){
+        for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+          if(dr||dc)reveal(r+dr,c+dc);
+        }
+      }else{
+        showToast('⚠️ 旗子数不匹配 (需'+board[r][c]+'面旗)');
+      }
+    });
+    // right-click → cycle: flag → ? → clear
+    div.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      if(gameOver||revealed[r][c])return;
+      if(!gameStarted){gameStarted=true;firstClick=false;startTimer();}
+      toggleFlag(r,c);
+    });
+    // long-press for mobile flag
+    div.addEventListener('pointerdown',e=>{
+      if(gameOver||revealed[r][c])return;
+      if(e.button!==0)return; // only left pointer
+      isTouchMove=false;
+      longPressTimer=setTimeout(()=>{
+        if(!isTouchMove){
+          if(!gameStarted){gameStarted=true;firstClick=false;startTimer();}
+          toggleFlag(r,c);
+          try{navigator.vibrate?.(15);}catch(_){}
+        }
+      },500);
+    });
+    div.addEventListener('pointermove',()=>{isTouchMove=true;});
+    div.addEventListener('pointerup',()=>{clearTimeout(longPressTimer);});
+    div.addEventListener('pointerleave',()=>{clearTimeout(longPressTimer);isTouchMove=false;});
+    gridEl.appendChild(div);
+  }
+}
+
+// ═══════════ TIMER ═══════════
+function startTimer(skipReset=false){
+  if(timerInterval)return;
+  if(!skipReset){timerSec=0;timerEl.textContent='0';}
+  timerInterval=setInterval(()=>{
+    if(gameOver)return;
+    timerSec++;timerEl.textContent=timerSec;
+  },1000);
+}
+function stopTimer(){clearInterval(timerInterval);timerInterval=null;}
+function updateBest(){
+  const diffKey=Object.entries(DIFFICULTIES).find(([,v])=>v.rows===ROWS&&v.cols===COLS&&v.mines===MINES)?.[0]||'easy';
+  const bt=window._msStats[diffKey];
+  bestEl.textContent=bt?bt:'-';
+}
+
+// ═══════════ SKINS ═══════════
+function applySkin(id){
+  currentSkin=id;
+  localStorage.setItem('_ms_skin',id);
+  document.documentElement.className='skin-'+id;
+  document.querySelectorAll('.skin-dot').forEach(d=>d.classList.toggle('active',d.dataset.skin===id));
+  renderGrid();
+}
+function buildSkinPicker(){
+  const picker=document.getElementById('skinPicker');
+  picker.innerHTML='';
+  SKINS.forEach(s=>{
+    const dot=document.createElement('div');
+    dot.className='skin-dot'+(s.id===currentSkin?' active':'');
+    dot.dataset.skin=s.id;
+    dot.textContent=s.emoji;
+    dot.title=s.name;
+    dot.addEventListener('click',()=>applySkin(s.id));
+    picker.appendChild(dot);
+  });
+}
+initBoard(); // init arrays before renderGrid
+applySkin(currentSkin);
+buildSkinPicker();
+
+// ═══════════ DIFFICULTY ═══════════
+function setDifficulty(diff){
+  const d=DIFFICULTIES[diff];
+  ROWS=d.rows;COLS=d.cols;MINES=d.mines;
+  document.getElementById('diffLabel').textContent=`${d.rows}×${d.cols} · ${d.mines}💣`;
+  document.querySelectorAll('.controls .btn[data-diff]').forEach(b=>b.classList.toggle('active',b.dataset.diff===diff));
+  initBoard();
+  renderGrid();
+  updateBest();
+}
+document.querySelectorAll('.controls .btn[data-diff]').forEach(b=>{
+  b.addEventListener('click',()=>setDifficulty(b.dataset.diff));
+});
+let confirmNewTimeout=null;
+document.getElementById('btnNew').addEventListener('click',()=>{
+  if(gameStarted&&!gameOver){
+    // Confirm: change button text briefly
+    const btn=document.getElementById('btnNew');
+    if(btn.textContent.includes('确认')){
+      clearTimeout(confirmNewTimeout);
+      initBoard();renderGrid();updateBest();
+      btn.textContent='🔄 新局';
+      return;
+    }
+    btn.textContent='⚠️ 再点确认';
+    btn.style.background='#e74c3c';btn.style.color='#fff';
+    confirmNewTimeout=setTimeout(()=>{
+      btn.textContent='🔄 新局';
+      btn.style.background='';btn.style.color='';
+    },1800);
+    return;
+  }
+  initBoard();renderGrid();updateBest();
+});
+// Flag mode toggle
+flagModeBtn.addEventListener('click',()=>{
+  flagMode=!flagMode;
+  flagModeBtn.textContent=flagMode?'🚩':'⛏️';
+  flagModeBtn.classList.toggle('flag-on',flagMode);
+  gridEl.classList.toggle('flag-mode',flagMode);
+  try{navigator.vibrate?.(10);}catch(_){}
+});
+// Mute toggle
+muteBtn.addEventListener('click',()=>{
+  audioMuted=!audioMuted;
+  muteBtn.textContent=audioMuted?'🔇':'🔊';
+  muteBtn.classList.toggle('muted',audioMuted);
+  localStorage.setItem('_ms_muted',audioMuted?'1':'0');
+  showToast(audioMuted?'🔇 音效已关闭':'🔊 音效已开启');
+});
+// Init mute button state
+muteBtn.textContent=audioMuted?'🔇':'🔊';
+muteBtn.classList.toggle('muted',audioMuted);
+setDifficulty('easy');
+
+// ═══════════ OVERLAY ═══════════
+overlayBtn.addEventListener('click',()=>{
+  overlay.classList.remove('show');
+  initBoard();renderGrid();updateBest();
+});
+
+// ═══════════ STATS PANEL ═══════════
+let timerWasRunning=false;
+document.getElementById('bestBox').addEventListener('click',()=>{
+  const s=window._msStats;
+  const panel=document.getElementById('stats-panel');
+  // Pause timer while viewing stats
+  if(timerInterval&&!gameOver){timerWasRunning=true;stopTimer();}else{timerWasRunning=false;}
+  document.getElementById('statsTitle').textContent='📊 游戏统计';
+  const allWins=(s.wins_tiny||0)+(s.wins_easy||0)+(s.wins_medium||0);
+  const games=s.games||0, streak=s.streak||0;
+  const html='<div class="si"><div class="sv">'+games+'</div><div class="sl">总局数</div></div>'+
+    '<div class="si"><div class="sv">'+(games?Math.round(allWins/games*100):'-')+'%</div><div class="sl">总胜率</div></div>'+
+    '<div class="si"><div class="sv">'+streak+'</div><div class="sl">连胜</div></div>'+
+    Object.entries(DIFFICULTIES).map(([k,v])=>{
+    const best=s[k]||'-';
+    const wins=s['wins_'+k]||0;
+    return '<div class="si"><div class="sv">'+(best==='-'?'-':best+'s')+'</div><div class="sl">'+v.rows+'×'+v.cols+'</div><div style="font-size:9px;color:#999">🏆'+wins+'胜</div></div>';
+  }).join('');
+  document.getElementById('statsContent').innerHTML=html;
+  panel.classList.add('show');
+});
+document.getElementById('statsClose').addEventListener('click',()=>{
+  document.getElementById('stats-panel').classList.remove('show');
+  if(timerWasRunning&&!gameOver)startTimer(true);
+});
+
+// ═══════════ RESIZE ═══════════
+window.addEventListener('resize',()=>{
+  if(!gameOver)renderGrid();
+});
+window.addEventListener('orientationchange',()=>{
+  setTimeout(()=>{if(!gameOver)renderGrid();},300);
+});
+
+// ═══════════ INIT ═══════════
+// First-visit tutorial
+if(!localStorage.getItem('_ms_visited')){
+  localStorage.setItem('_ms_visited','1');
+  setTimeout(()=>showToast('👆 点格子挖开 | 🔒 长按插旗 | ⛏️ 切换旗子模式'),500);
+}
+updateBest();
+renderGrid();
+</script>
+</body>
+</html>

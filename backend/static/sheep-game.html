@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>🐑 羊了个羊</title>
+<style>
+:root {
+  --bg: #e8f5e9; --card: #fff;
+  --green: #66bb6a; --dark: #2e7d32;
+  --slot-bg: #c8e6c9; --slot-border: #a5d6a7;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg);color:#333;min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;align-items:center;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  overflow-x:hidden;
+}
+
+/* Header */
+.header{padding:12px 16px 4px;text-align:center;width:100%;max-width:420px}
+.header .title{font-size:20px;font-weight:700;color:var(--dark);display:flex;align-items:center;justify-content:center;gap:8px}
+.header .sub{font-size:11px;color:#888;margin-top:2px}
+
+/* Score */
+.score-bar{display:flex;justify-content:space-between;width:100%;max-width:420px;padding:4px 16px}
+.score-item{text-align:center;flex:1}
+.score-item .label{font-size:10px;color:#888}
+.score-item .value{font-size:16px;font-weight:700;color:var(--green)}
+
+/* Board */
+#board-wrap{flex:1;width:100%;max-width:420px;display:flex;align-items:center;justify-content:center;padding:4px 8px}
+#board{position:relative;width:min(340px,90vw);height:min(300px,42vh);background:radial-gradient(ellipse at center,rgba(102,187,106,.08),transparent 70%);border-radius:12px;overflow:visible}
+
+.tile{position:absolute;width:48px;height:48px;background:var(--card);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;transition:transform .15s,opacity .2s,box-shadow .15s;box-shadow:2px 2px 8px rgba(0,0,0,.15);border:2px solid #e0e0e0}
+.tile.covered{opacity:.45;pointer-events:none;box-shadow:none;filter:brightness(.7)}
+.tile:not(.covered):active{transform:scale(.92)}
+.tile.flash{animation:tileFlash .4s ease}
+
+@keyframes tileFlash{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.15);filter:brightness(1.3)}
+}
+
+/* Slot bar */
+#slot-wrap{width:100%;max-width:420px;padding:8px 16px 12px}
+#slot-bar{display:flex;gap:6px;justify-content:center;background:rgba(102,187,106,.08);padding:10px 8px;border-radius:14px;border:2px dashed var(--slot-border)}
+.slot{width:min(40px,11vw);height:min(40px,11vw);background:var(--slot-bg);border-radius:10px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:22px;transition:all .2s}
+.slot.filled{background:#fff;border-color:var(--green);box-shadow:0 2px 4px rgba(0,0,0,.1)}
+.slot.match{animation:matchPop .35s ease}
+
+@keyframes matchPop{
+  0%{transform:scale(1)}
+  30%{transform:scale(1.3);filter:brightness(1.5)}
+  100%{transform:scale(0);opacity:0}
+}
+
+/* Tools */
+#tool-bar{display:flex;gap:8px;justify-content:center;width:100%;max-width:420px;padding:0 16px 8px}
+.tool-btn{flex:1;max-width:100px;padding:10px 0;border:none;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:#fff;color:#666;border:1px solid #ddd;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tool-btn:active{transform:scale(.94)}
+.tool-btn .tb-count{font-size:10px;color:#999}
+.tool-btn:disabled{opacity:.35;pointer-events:none}
+
+/* Bottom */
+#bottom-bar{display:flex;gap:8px;width:100%;max-width:420px;padding:8px 16px 16px}
+.btn{flex:1;padding:12px;border:none;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn:active{transform:scale(.94)}
+.btn-green{background:var(--green);color:#fff}
+.btn-outline{background:transparent;color:var(--green);border:2px solid var(--green)}
+.footer{font-size:10px;color:#aaa;padding:0 0 12px}
+
+/* Overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn .3s}
+.overlay .modal{background:#fff;border-radius:20px;padding:32px 24px;text-align:center;max-width:300px;width:90%;animation:popIn .35s cubic-bezier(.34,1.56,.64,1)}
+.overlay .modal .m-icon{font-size:56px;margin-bottom:12px}
+.overlay .modal h2{font-size:20px;margin-bottom:8px;color:var(--dark)}
+.overlay .modal p{font-size:13px;color:#888;margin-bottom:20px;line-height:1.6}
+.overlay .modal .btn{width:100%}
+
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* Particle */
+.particle{position:fixed;pointer-events:none;font-size:24px;z-index:200;animation:particleFly .6s ease-out forwards}
+@keyframes particleFly{
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)}
+}
+
+/* Toast */
+#toast{position:fixed;top:20%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 24px;border-radius:20px;font-size:14px;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title"><span>🐑</span>羊了个羊<span>🌾</span></div>
+  <div class="sub">点击牌面收集到槽位 · 3张相同自动消除</div>
+</div>
+
+<div class="score-bar">
+  <div class="score-item"><div class="label">🏆 最高</div><div class="value" id="best">0</div></div>
+  <div class="score-item"><div class="label">📊 剩余</div><div class="value" id="remain">0</div></div>
+  <div class="score-item"><div class="label">🔥 连击</div><div class="value" id="streak">0</div></div>
+</div>
+
+<div id="board-wrap"><div id="board"></div></div>
+
+<div id="slot-wrap"><div id="slot-bar">
+  <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+  <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+  <div class="slot"></div>
+</div></div>
+
+<div id="tool-bar">
+  <button class="tool-btn" id="tbShuffle" onclick="doShuffle()">
+    🔀<span class="tb-count" id="cntShuffle">3</span>
+  </button>
+  <button class="tool-btn" id="tbUndo" onclick="doUndo()">
+    ↩️<span class="tb-count" id="cntUndo">3</span>
+  </button>
+  <button class="tool-btn" id="tbPeek" onclick="doPeek()">
+    👁️<span class="tb-count" id="cntPeek">3</span>
+  </button>
+</div>
+
+<div id="bottom-bar">
+  <button class="btn btn-outline" onclick="restart()">🔄 再来一局</button>
+  <button class="btn btn-green" onclick="location.href='/nav'">🏠 游戏大厅</button>
+</div>
+<div class="footer">适度游戏益脑 · 沉迷伤身</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════ Game State ═══════
+const TYPES = ['🐑','🐏','🐐','🐄','🐖','🐓','🦆','🐕','🐈','🐇','🌽','🥕','🍎','🍞','⭐','🌙'];
+const BOARD_W = 340, BOARD_H = 300;
+const TILE_S = 48; // tile size
+
+let tiles = [];        // {id, type, x, y, layer, el}
+let slots = [];        // [{type, slotIdx}]
+let streak = 0;
+let bestScore = 0;
+let totalCleared = 0;
+let tools = {shuffle:3, undo:3, peek:3};
+let undoStack = [];
+
+// Load best
+bestScore = parseInt(localStorage.getItem('sheep_best')||'0');
+document.getElementById('best').textContent = bestScore;
+
+// ═══════ Tile Generation ═══════
+function generateTiles(){
+  tiles = [];
+  // Use 14 types × 3 = 42 tiles
+  const usedTypes = [...TYPES].sort(()=>Math.random()-.5).slice(0,15);
+  // Each type appears 3 times
+  let pool = [];
+  usedTypes.forEach(t => {for(let i=0;i<3;i++)pool.push(t)});
+  // Shuffle
+  for(let i=pool.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [pool[i],pool[j]]=[pool[j],pool[i]];
+  }
+
+  // Layer layout: spread tiles across 3 layers
+  // Layer 0 (bottom): 5-6 cols × 3-4 rows
+  // Layer 1 (middle): smaller grid, offset
+  // Layer 2 (top): few tiles scattered
+
+  const total = pool.length;
+  
+  // Layer sizes (bottom-heavy)
+  const l0Count = Math.floor(total * 0.45); // ~19
+  const l1Count = Math.floor(total * 0.33); // ~14
+  const l2Count = total - l0Count - l1Count; // ~9
+
+  let id = 0;
+  
+  // Layer 0: 6×5 grid-ish
+  const l0Cols = 6, l0Rows = 5;
+  const l0Spots = [];
+  for(let r=0;r<l0Rows;r++)
+    for(let c=0;c<l0Cols;c++)
+      l0Spots.push({x:20+c*52, y:20+r*52});
+  // Shuffle spots, pick needed count
+  for(let i=l0Spots.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [l0Spots[i],l0Spots[j]]=[l0Spots[j],l0Spots[i]];
+  }
+  for(let i=0;i<Math.min(l0Count, l0Spots.length);i++){
+    tiles.push({id:id++, type:pool.pop(), x:l0Spots[i].x, y:l0Spots[i].y, layer:0});
+  }
+
+  // Layer 1: 5×4, offset by half tile
+  const l1Cols = 5, l1Rows = 4;
+  const l1Spots = [];
+  for(let r=0;r<l1Rows;r++)
+    for(let c=0;c<l1Cols;c++)
+      l1Spots.push({x:46+c*52, y:46+r*52});
+  for(let i=l1Spots.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [l1Spots[i],l1Spots[j]]=[l1Spots[j],l1Spots[i]];
+  }
+  for(let i=0;i<Math.min(l1Count, l1Spots.length);i++){
+    tiles.push({id:id++, type:pool.pop(), x:l1Spots[i].x, y:l1Spots[i].y, layer:1});
+  }
+
+  // Layer 2: scattered
+  const l2Cols = 4, l2Rows = 3;
+  const l2Spots = [];
+  for(let r=0;r<l2Rows;r++)
+    for(let c=0;c<l2Cols;c++)
+      l2Spots.push({x:72+c*52, y:72+r*52});
+  for(let i=l2Spots.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [l2Spots[i],l2Spots[j]]=[l2Spots[j],l2Spots[i]];
+  }
+  for(let i=0;i<Math.min(l2Count, l2Spots.length);i++){
+    tiles.push({id:id++, type:pool.pop(), x:l2Spots[i].x, y:l2Spots[i].y, layer:2});
+  }
+
+  // If any remaining, add as layer 3 center tiles
+  const l3Spots = [
+    {x:98,y:98},{x:150,y:98},{x:124,y:150},{x:98,y:150},{x:150,y:150}
+  ];
+  let li = 0;
+  while(pool.length > 0 && li < l3Spots.length){
+    tiles.push({id:id++, type:pool.pop(), x:l3Spots[li].x, y:l3Spots[li].y, layer:3});
+    li++;
+  }
+}
+
+// ═══════ Cover Detection ═══════
+function isCovered(tile){
+  for(const t of tiles){
+    if(t.layer <= tile.layer) continue;
+    // Check overlap
+    const dx = Math.abs(t.x - tile.x);
+    const dy = Math.abs(t.y - tile.y);
+    if(dx < TILE_S * 0.75 && dy < TILE_S * 0.75) return true;
+  }
+  return false;
+}
+
+// ═══════ Rendering ═══════
+function renderBoard(){
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  
+  // Sort by layer for rendering
+  const sorted = [...tiles].sort((a,b)=>a.layer-b.layer || a.y-b.y || a.x-b.x);
+  
+  sorted.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    if(isCovered(t)) el.classList.add('covered');
+    el.textContent = t.type;
+    el.style.left = t.x + 'px';
+    el.style.top = t.y + 'px';
+    el.style.zIndex = t.layer * 10;
+    
+    if(!isCovered(t)){
+      el.addEventListener('click', (e) => onTileClick(t, e));
+    }
+    
+    t.el = el;
+    board.appendChild(el);
+  });
+  
+  document.getElementById('remain').textContent = tiles.length;
+}
+
+function renderSlots(){
+  const bar = document.getElementById('slot-bar');
+  const slotEls = bar.querySelectorAll('.slot');
+  slotEls.forEach((el, i) => {
+    if(i < slots.length){
+      el.textContent = slots[i].type;
+      el.classList.add('filled');
+    }else{
+      el.textContent = '';
+      el.classList.remove('filled');
+    }
+    el.classList.remove('match');
+  });
+  
+  // Update tool counts
+  document.getElementById('cntShuffle').textContent = tools.shuffle;
+  document.getElementById('cntUndo').textContent = tools.undo;
+  document.getElementById('cntPeek').textContent = tools.peek;
+  document.getElementById('tbShuffle').disabled = tools.shuffle <= 0;
+  document.getElementById('tbUndo').disabled = tools.undo <= 0;
+  document.getElementById('tbPeek').disabled = tools.peek <= 0;
+}
+
+// ═══════ Game Logic ═══════
+function onTileClick(tile, event){
+  // Block if slots already full
+  if(slots.length >= 7) return;
+  
+  // Save undo state
+  undoStack.push({tileId: tile.id, slotsBefore: [...slots.map(s=>({type:s.type}))]});
+  
+  // Add to slots
+  slots.push({type: tile.type});
+  
+  // Remove from board
+  tiles = tiles.filter(t => t.id !== tile.id);
+  tile.el.classList.add('flash');
+  setTimeout(() => tile.el.remove(), 400);
+  
+  // Check for 3-match
+  checkMatch();
+  
+  // Re-render
+  renderBoard();
+  renderSlots();
+  
+  // Check game state
+  checkGameState();
+}
+
+function checkMatch(){
+  // Find 3 of same type in slots
+  const counts = {};
+  slots.forEach(s => {
+    counts[s.type] = (counts[s.type]||0) + 1;
+  });
+  
+  for(const [type, count] of Object.entries(counts)){
+    if(count >= 3){
+      // Remove 3 of this type with animation
+      let removed = 0;
+      slots = slots.filter(s => {
+        if(s.type === type && removed < 3){removed++; return false;}
+        return true;
+      });
+      
+      // Animate slots
+      const slotEls = document.getElementById('slot-bar').querySelectorAll('.slot');
+      let matched = 0;
+      slots.forEach((s, i) => {
+        if(i < 7 && s.type === type && matched < 3){
+          // should not happen since we filtered
+        }
+      });
+      
+      // Flash all filled slots
+      slotEls.forEach(el => {if(el.classList.contains('filled')) el.classList.add('match')});
+      
+      // Score & streak
+      streak++;
+      totalCleared += 3;
+      if(streak > 1) toast(`${streak}连击! 🔥`);
+      
+      // Particles
+      spawnParticles(type);
+      
+      // Update best
+      const totalCleared = 42 - tiles.length;
+      if(totalCleared > bestScore){
+        bestScore = totalCleared;
+        localStorage.setItem('sheep_best', bestScore);
+        document.getElementById('best').textContent = bestScore;
+      }
+      document.getElementById('streak').textContent = streak;
+      
+      // Re-render after animation
+      setTimeout(renderSlots, 350);
+      return;
+    }
+  }
+}
+
+function checkGameState(){
+  if(tiles.length === 0 && slots.length === 0){
+    // Win!
+    setTimeout(() => showOverlay('🎉', '恭喜通关!', `你就是羊了个羊的天选之人!\n消除了 ${totalCleared} 张牌`, true), 500);
+  }else if(tiles.length === 0 && slots.length > 0 && !hasMatch()){
+    // Stuck - all tiles collected but no match
+    setTimeout(() => showOverlay('😵', '卡住了!', `牌已取完但槽内无三消\n消除了 ${totalCleared} 张牌`, false), 500);
+  }else if(slots.length >= 7){
+    // Check if any slot combination can make 3
+    if(!hasMatch()){
+      setTimeout(() => showOverlay('💔', '游戏结束', `槽位已满!\n消除了 ${totalCleared} 张牌`, false), 500);
+    }
+  }
+}
+
+function hasMatch(){
+  const counts = {};
+  slots.forEach(s => counts[s.type] = (counts[s.type]||0) + 1);
+  return Object.values(counts).some(c => c >= 3);
+}
+
+// ═══════ Tools ═══════
+function doShuffle(){
+  if(tools.shuffle <= 0 || tiles.length === 0) return;
+  tools.shuffle--;
+  // Shuffle tile positions
+  const positions = tiles.map(t => ({x:t.x, y:t.y}));
+  for(let i=positions.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [positions[i],positions[j]]=[positions[j],positions[i]];
+  }
+  tiles.forEach((t,i)=>{t.x=positions[i].x; t.y=positions[i].y});
+  renderBoard();
+  renderSlots();
+  toast('已打乱顺序 🔀');
+}
+
+function doUndo(){
+  if(tools.undo <= 0 || undoStack.length === 0) return;
+  tools.undo--;
+  const last = undoStack.pop();
+  // Restore tile
+  const removedFromBoard = slots[slots.length-1];
+  if(!removedFromBoard) return;
+  
+  const tileId = last.tileId;
+  // Find the last position (approximate - we just put it back somewhere)
+  const freeSpots = [];
+  for(let y=20;y<BOARD_H-40;y+=48){
+    for(let x=20;x<BOARD_W-40;x+=48){
+      const occupied = tiles.some(t => Math.abs(t.x-x)<40 && Math.abs(t.y-y)<40);
+      if(!occupied) freeSpots.push({x,y});
+    }
+  }
+  if(freeSpots.length > 0){
+    const spot = freeSpots[Math.floor(Math.random()*freeSpots.length)];
+    tiles.push({id:tileId, type:removedFromBoard.type, x:spot.x, y:spot.y, layer:0});
+    slots.pop();
+  }
+  
+  renderBoard();
+  renderSlots();
+  toast('已撤销 ↩️');
+}
+
+function doPeek(){
+  if(tools.peek <= 0) return;
+  tools.peek--;
+  // Briefly highlight all matchable tiles
+  const slotCounts = {};
+  slots.forEach(s => slotCounts[s.type] = (slotCounts[s.type]||0)+1);
+  
+  tiles.forEach(t => {
+    if(!isCovered(t) && (slotCounts[t.type]||0) >= 2){
+      t.el.style.boxShadow = '0 0 16px rgba(255,193,7,.8)';
+      t.el.style.borderColor = '#ffc107';
+      setTimeout(() => {
+        t.el.style.boxShadow = '2px 2px 8px rgba(0,0,0,.15)';
+        t.el.style.borderColor = '#e0e0e0';
+      }, 1500);
+    }
+  });
+  renderSlots();
+  toast('高亮可匹配牌 👁️');
+}
+
+// ═══════ Effects ═══════
+function spawnParticles(type){
+  for(let i=0;i<8;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    p.textContent=type;
+    p.style.left='50%';
+    p.style.top='70%';
+    p.style.setProperty('--dx',(Math.random()-.5)*200+'px');
+    p.style.setProperty('--dy',-(Math.random()*150+50)+'px');
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(),600);
+  }
+}
+
+let toastTimer;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+
+function showOverlay(icon, title, msg, isWin){
+  const overlay=document.createElement('div');
+  overlay.className='overlay';
+  overlay.innerHTML=`<div class="modal">
+    <div class="m-icon">${icon}</div>
+    <h2>${title}</h2>
+    <p>${msg.replace(/\n/g,'<br>')}</p>
+    <button class="btn btn-green" onclick="this.closest('.overlay').remove();restart()">🔄 再来一局</button>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
+}
+
+function restart(){
+  document.querySelectorAll('.overlay').forEach(o=>o.remove());
+  slots=[];
+  streak=0;
+  totalCleared=0;
+  undoStack=[];
+  tools={shuffle:3, undo:3, peek:3};
+  document.getElementById('streak').textContent='0';
+  generateTiles();
+  renderBoard();
+  renderSlots();
+}
+
+// ═══════ Adaptive Resize ═══════
+function adaptSize(){
+  const vw = window.innerWidth;
+  const scale = Math.min(1, vw / 380);
+  // Adjust tile size for small screens
+  document.documentElement.style.setProperty('--tile-scale', scale);
+  // We adapt via the board width which is already min(340px, 90vw)
+}
+
+window.addEventListener('resize', adaptSize);
+
+// ═══════ Init ═══════
+generateTiles();
+renderBoard();
+renderSlots();
+adaptSize();
+</script>
+</body>
+</html>
