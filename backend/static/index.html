@@ -177,8 +177,9 @@ body.drag-scrolling { overflow: hidden !important; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bm-visit {
-  position: absolute; top: 8px; right: 8px;
-  font-size: 10px; color: var(--lightink);
+  font-size: 11px; color: var(--lightink);
+  margin-left: 6px; vertical-align: baseline;
+  opacity: 0.7;
 }
 .bm-edit {
   position: absolute; bottom: 8px; right: 8px;
@@ -187,6 +188,23 @@ body.drag-scrolling { overflow: hidden !important; }
 }
 .bookmark-card:hover .bm-edit { opacity: 1; }
 .bookmark-card:active .bm-edit { opacity: 1; }
+
+.bm-open, .bm-restart {
+  position: absolute; top: 10px;
+  font-size: 18px; opacity: 0; transition: opacity .2s;
+  cursor: pointer; background: none; border: none;
+  color: var(--accent); padding: 2px 4px;
+}
+.bm-open { right: 24px; }
+.bm-restart { right: 64px; }
+.bookmark-card:hover .bm-open,
+.bookmark-card:hover .bm-restart,
+.bookmark-card:active .bm-open,
+.bookmark-card:active .bm-restart { opacity: 0.7; }
+.bm-restart.spinning {
+  animation: spin .8s linear infinite; opacity: 1;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* FAB */
 .fab {
@@ -344,9 +362,10 @@ body.drag-scrolling { overflow: hidden !important; }
       @touchstart="onCardTouchStart($event, bm)" @touchmove="onCardTouchMove($event)" @touchend="onCardTouchEnd"
       @click="handleBmTap($event, bm)">
       <span class="bm-icon">{{bm.icon}}</span>
-      <div class="bm-title">{{bm.title}}</div>
+      <div class="bm-title">{{bm.title}}<span class="bm-visit">×{{bm.visit_count}}</span></div>
       <div class="bm-url">{{bm.url}}</div>
-      <span class="bm-visit">×{{bm.visit_count}}</span>
+      <button class="bm-restart" v-if="getServiceId(bm)" @click.stop="restartSvc(bm,$event)" title="重启">🔄</button>
+      <button class="bm-open" @click.stop="openUrl(bm)" title="打开">🔗</button>
       <button class="bm-edit" @click.stop="startEditBm(bm)">✎</button>
       <div class="bm-actions" v-if="selectedBmId === bm.id">
         <button @click.stop="startEditBm(bm)">✎ 编辑</button>
@@ -640,12 +659,23 @@ const app = createApp({
     }
 
     async function loadAll() {
-      const [a, c, b] = await Promise.all([
-        api('/api/ambiance'), api('/api/categories'), api('/api/bookmarks')
-      ]);
-      if (a) Object.assign(ambiance, a);
-      if (c) categories.value = c.categories;
-      if (b) bookmarks.value = b.bookmarks;
+      try {
+        const [a, c, b] = await Promise.all([
+          api('/api/ambiance'), api('/api/categories'), api('/api/bookmarks')
+        ]);
+        if (a) Object.assign(ambiance, a);
+        if (c) categories.value = c.categories;
+        if (b) bookmarks.value = b.bookmarks;
+      } catch(e) {
+        console.warn('NeuNav loadAll failed, retrying once...', e.message);
+        // 单次重试
+        const [a, c, b] = await Promise.all([
+          api('/api/ambiance'), api('/api/categories'), api('/api/bookmarks')
+        ]);
+        if (a) Object.assign(ambiance, a);
+        if (c) categories.value = c.categories;
+        if (b) bookmarks.value = b.bookmarks;
+      }
     }
 
     async function addBookmark() {
@@ -679,6 +709,46 @@ const app = createApp({
       await api('/api/bookmarks/' + bm.id + '/visit', { method: 'PUT' });
       window.open(bm.url, '_blank');
       await loadAll();
+    }
+
+    // ── 服务重启 ──
+    const SERVICE_URL_MAP = {
+      'ct256.cn/numtool': 'numtool',
+      'ct256.cn/aa': 'aa',
+      'ct256.cn/remind': 'remind',
+      'ct256.cn/purchase': 'purchase',
+      'ct256.cn/fund/': 'fund',
+      'ct256.cn/funds-v2': 'stock',
+      'ct256.cn/push': 'push',
+      'ct256.cn/guardian': 'guardian',
+    };
+    function getServiceId(bm) {
+      const url = (bm.url || '').toLowerCase();
+      for (const [pattern, sid] of Object.entries(SERVICE_URL_MAP)) {
+        // 精确匹配：pattern 后必须跟 / 或 # 或 ? 或行尾
+        const idx = url.indexOf(pattern);
+        if (idx === -1) continue;
+        const after = url[idx + pattern.length];
+        if (!after || after === '/' || after === '#' || after === '?') return sid;
+      }
+      return null;
+    }
+    async function restartSvc(bm, ev) {
+      const sid = getServiceId(bm);
+      if (!sid) return;
+      const btn = ev.target;
+      btn.classList.add('spinning');
+      btn.textContent = '⏳';
+      try {
+        const res = await fetch('/api/restart/' + sid, { method: 'POST' });
+        const data = await res.json();
+        btn.classList.remove('spinning');
+        btn.textContent = data.ok ? '✅' : '❌';
+      } catch(e) {
+        btn.classList.remove('spinning');
+        btn.textContent = '❌';
+      }
+      setTimeout(() => { btn.textContent = '🔄'; }, 2500);
     }
 
     function onSearch() {
@@ -888,6 +958,7 @@ const app = createApp({
       startLongPress, startCatLongPress, cancelLongPress,
       startEditBm, startEditCat, saveBmEdit, saveCatEdit,
       loadAll, addBookmark, delBookmark, delCategory, addCategory, openUrl,
+      getServiceId, restartSvc,
       onSearch, onSearchEnter, toggleTheme
     };
   }
