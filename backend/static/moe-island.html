@@ -181,6 +181,17 @@ body::after{
 /* ── Particle ── */
 .particle{position:fixed;pointer-events:none;font-size:20px;z-index:100;animation:particleUp .4s ease-out forwards}
 @keyframes particleUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-40px) scale(1.5)}}
+
+/* Leaderboard mini */
+.lb-row{display:flex;align-items:center;gap:8px;padding:8px;border-radius:12px;margin-bottom:4px;background:rgba(255,255,255,.5);font-size:13px}
+.lb-rank{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0}
+.lb-rank.gold{background:linear-gradient(135deg,#FFD700,#FFA500);color:#fff}
+.lb-rank.silver{background:linear-gradient(135deg,#C0C0C0,#A0A0A0);color:#fff}
+.lb-rank.bronze{background:linear-gradient(135deg,#CD7F32,#A0522D);color:#fff}
+.lb-rank.normal{background:rgba(128,128,128,.15);color:var(--sub)}
+.lb-name{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-cps{font-weight:800;color:var(--accent);text-align:right}
+.lb-empty{text-align:center;color:var(--sub);padding:16px;font-size:14px}
 </style>
 </head>
 <body>
@@ -197,7 +208,7 @@ body::after{
 
   <!-- Board -->
   <div class="board-wrap">
-    <div class="hint" id="hint">👆 点一下选中，再点同类型合成</div>
+    <div class="hint" id="hint">👆 点选→再点合成 &nbsp;|&nbsp; 再点同格=出售</div>
     <div class="board" id="board"></div></div>
 
   <!-- Bottom Nav -->
@@ -219,7 +230,7 @@ body::after{
 const COLS=5, ROWS=6;
 
 const ITEM_CONFIG = {
-  wood:  {name:'木材', lvls:['🌱','🪵','🌳','🪓','🏗️','🏠','🏰','🏯','🗼','🌲✨']},
+  wood:  {name:'木材', lvls:['🪵','🪓','🌳','🏗️','🏠','🏰','🏯','🗼','🌲✨','🏛️']},
   stone: {name:'石头', lvls:['🪨','⚪','🔮','💠','🏛️','🗿','⛩️','🕌','🏛️✨','💎']},
   flower:{name:'花朵', lvls:['🌱','🌿','🌷','🌸','🌺','🌻','💐','🏵️','🌼✨','🌈']},
   shell: {name:'贝壳', lvls:['🐚','🦪','🐙','🦑','🦞','🐠','🐡','🐬','🐳','🐉']},
@@ -270,10 +281,22 @@ function findEmpty(){
 
 function spawnItem(){
   const empties=findEmpty();
-  if(empties.length===0){toast('棋盘已满，请合成清理');return;}
+  if(empties.length===0){toast('棋盘已满，出售物品腾空间');return;}
 
   const keys=Object.keys(ITEM_CONFIG);
-  const type=keys[Math.floor(Math.random()*keys.length)];
+  // Bias: prefer types already on the board for merge chances
+  const typeCounts={};
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const it=getCell(r,c);if(it)typeCounts[it.type]=(typeCounts[it.type]||0)+1;
+  }
+  let type;
+  if(Object.keys(typeCounts).length>0 && Math.random()<0.7){
+    // 70% chance: pick from existing types
+    const existing=Object.keys(typeCounts);
+    type=existing[Math.floor(Math.random()*existing.length)];
+  }else{
+    type=keys[Math.floor(Math.random()*keys.length)];
+  }
   const pos=empties[Math.floor(Math.random()*empties.length)];
   const item={type,level:1};
   setCell(pos.r,pos.c,item);
@@ -294,7 +317,9 @@ function mergeItems(itemA,itemB){
 function renderStats(){
   document.getElementById('gold').textContent=state.gold.toLocaleString();
   document.getElementById('diamond').textContent=state.diamond;
-  document.getElementById('energy').textContent=state.energy;
+  const energyEl=document.getElementById('energy');
+  energyEl.textContent=state.energy;
+  energyEl.style.color=state.energy<10?'var(--err)':state.energy<25?'var(--gold)':'';
 }
 
 function renderBoard(){
@@ -343,10 +368,17 @@ function onCellClick(e){
   const item=getCell(r,c);
   if(!item)return;
 
-  // Clicking the already-selected cell → deselect
+  // Clicking the already-selected cell → sell item
   if(selectedCell && selectedCell.r===r && selectedCell.c===c){
+    const sellPrice=item.level*2+1;
+    state.gold+=sellPrice;
+    setCell(r,c,null);
     cell.classList.remove('selected');
     selectedCell=null;
+    const rect=cell.getBoundingClientRect();
+    spawnParticles(rect.left+rect.width/2,rect.top+rect.height/2);
+    toast(`出售 ${ITEM_CONFIG[item.type].name} Lv${item.level} +${sellPrice}🪙`);
+    saveState();renderBoard();renderStats();
     return;
   }
 
@@ -362,6 +394,7 @@ function onCellClick(e){
   const merged=mergeItems(selItem,item);
   if(merged){
     // ✅ Match — merge!
+    if(!consumeEnergy(2)){selectedCell=null;return;}
     const hint=document.getElementById('hint');
     if(hint)hint.classList.add('hidden');
     selectedCell.el.classList.remove('selected');
@@ -371,7 +404,6 @@ function onCellClick(e){
     spawnParticles(rect.left+rect.width/2,rect.top+rect.height/2);
     cell.classList.add('bounce');
     state.gold+=merged.level*5;
-    state.energy=Math.max(0,state.energy-2);
     toast(`${ITEM_CONFIG[merged.type].name} Lv${merged.level} 合成! +${merged.level*5}🪙`);
     selectedCell=null;
     saveState();
@@ -463,12 +495,12 @@ function onDragEnd(e){
     if(targetItem){
       const merged=mergeItems(dragItem,targetItem);
       if(merged){
+        if(!consumeEnergy(2)){dragItem=null;dragFrom=null;return;}
         setCell(dragFrom.r,dragFrom.c,null);
         setCell(tr,tc,merged);
         const rect=target.getBoundingClientRect();
         spawnParticles(rect.left+rect.width/2,rect.top+rect.height/2);
         state.gold+=merged.level*5;
-        state.energy=Math.max(0,state.energy-2);
         toast(`${ITEM_CONFIG[merged.type].name} Lv${merged.level} 合成!`);
         saveState();
         renderBoard();
@@ -478,9 +510,9 @@ function onDragEnd(e){
         setTimeout(()=>target.classList.remove('bounce'),300);
       }
     }else{
+      if(!consumeEnergy(1)){dragItem=null;dragFrom=null;return;}
       setCell(dragFrom.r,dragFrom.c,null);
       setCell(tr,tc,dragItem);
-      state.energy=Math.max(0,state.energy-1);
       saveState();
       renderBoard();
     }
@@ -565,27 +597,158 @@ document.querySelectorAll('.bnav .b').forEach(btn=>{
     document.querySelectorAll('.bnav .b').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const tab=btn.dataset.tab;
-    if(tab==='backpack')toast('🎒 背包开发中');
-    else if(tab==='friends')toast('👥 好友系统开发中');
-    else if(tab==='shop')toast('🏪 商店开发中');
+    if(tab==='island'){closeAllModals();}
+    else if(tab==='backpack')showBackpack();
+    else if(tab==='shop')showShop();
+    else if(tab==='friends')showFriends();
   });
 });
 
-// ═══════════════════════════════════════════
-// Auto-spawn
-// ═══════════════════════════════════════════
+function closeAllModals(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.remove());
+}
+
+// ═══════ Shop ═══════
+function showShop(){
+  closeAllModals();
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  ov.innerHTML=`<div class="modal">
+    <h2>🏪 萌岛商店</h2>
+    <div style="text-align:left;margin:12px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,.6);border-radius:12px;margin-bottom:8px">
+        <span>⚡ 体力补充</span><span>5💎 → 满体力</span>
+        <button class="btn" style="padding:6px 16px;font-size:13px" onclick="buyEnergy()">购买</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,.6);border-radius:12px;margin-bottom:8px">
+        <span>🎲 随机物品</span><span>15🪙</span>
+        <button class="btn" style="padding:6px 16px;font-size:13px" onclick="buyRandomItem()">购买</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,.6);border-radius:12px;margin-bottom:8px">
+        <span>💎 钻石包</span><span>50🪙 → 3💎</span>
+        <button class="btn" style="padding:6px 16px;font-size:13px" onclick="buyDiamond()">购买</button>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:8px;background:rgba(139,115,85,.2);color:var(--text);box-shadow:none" onclick="closeAllModals()">关闭</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});
+}
+
+function buyEnergy(){
+  if(state.diamond<5){toast('💎 不足!');return;}
+  state.diamond-=5;state.energy=100;
+  closeAllModals();saveState();renderStats();
+  toast('⚡ 体力已恢复!');
+}
+function buyRandomItem(){
+  if(state.gold<15){toast('🪙 不足!');return;}
+  state.gold-=15;
+  spawnItem();
+  closeAllModals();saveState();renderStats();
+  toast('🎲 获得新物品!');
+}
+function buyDiamond(){
+  if(state.gold<50){toast('🪙 不足!');return;}
+  state.gold-=50;state.diamond+=3;
+  closeAllModals();saveState();renderStats();
+  toast('💎 +3!');
+}
+
+// ═══════ Backpack ═══════
+function showBackpack(){
+  closeAllModals();
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  const counts={}; let total=0;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const item=getCell(r,c);
+    if(item){const key=item.type+'_'+item.level;counts[key]=(counts[key]||0)+1;total++;}
+  }
+  let list='';
+  if(total===0) list='<div style="color:var(--sub);padding:16px">背包空空如也~</div>';
+  else{
+    const entries=Object.entries(counts);
+    entries.forEach(([key,cnt])=>{
+      const [type,lvl]=key.split('_');
+      const icon=ITEM_CONFIG[type].lvls[parseInt(lvl)-1];
+      const name=ITEM_CONFIG[type].name;
+      list+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.6);border-radius:12px;margin-bottom:6px">
+        <span>${icon} ${name} Lv${lvl}</span>
+        <span style="font-weight:600;color:var(--accent)">×${cnt}</span>
+      </div>`;
+    });
+  }
+  ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto">
+    <h2>🎒 背包</h2>
+    <p>共 ${total} 件物品</p>
+    ${list}
+    <button class="btn" style="margin-top:12px;background:rgba(139,115,85,.2);color:var(--text);box-shadow:none" onclick="closeAllModals()">关闭</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});
+}
+
+// ═══════ Friends (Leaderboard) ═══════
+let visitorId = localStorage.getItem('moe_visitor');
+if(!visitorId){visitorId='岛民'+String(Math.floor(Math.random()*9000)+1000);localStorage.setItem('moe_visitor',visitorId);}
+
+let friendData=JSON.parse(localStorage.getItem('moe_friends')||'[]');
+
+function saveFriendScore(){
+  const existing=friendData.findIndex(f=>f.id===visitorId);
+  if(existing>=0)friendData.splice(existing,1);
+  friendData.push({id:visitorId,gold:state.gold,diamond:state.diamond,total:state.gold+state.diamond*50,date:Date.now()});
+  friendData.sort((a,b)=>b.total-a.total);
+  if(friendData.length>30)friendData.pop();
+  localStorage.setItem('moe_friends',JSON.stringify(friendData));
+}
+
+function showFriends(){
+  closeAllModals();saveFriendScore();
+  const ov=document.createElement('div');ov.className='modal-overlay';
+  const top=friendData.slice(0,20);
+  const rc=['gold','silver','bronze'];
+  let rows=top.map((f,i)=>{
+    const rci=i<3?rc[i]:'normal';
+    const emoji=i===0?'👑':i===1?'🥈':i===2?'🥉':'';
+    const isMe=f.id===visitorId;
+    return `<div class="lb-row"${isMe?' style="border:1px solid var(--accent)"':''}>
+      <div class="lb-rank ${rci}">${emoji||(i+1)}</div>
+      <div class="lb-name">${f.id}${isMe?' ⭐':''}</div>
+      <div class="lb-cps">${f.total.toLocaleString()}💰</div>
+    </div>`;
+  }).join('');
+  if(!rows)rows='<div class="lb-empty">还没有岛民记录~</div>';
+  ov.innerHTML=`<div class="modal" style="max-height:70vh;overflow-y:auto">
+    <h2>👥 萌岛好友榜</h2>
+    <p>财富排行 · 我是 <b>${visitorId}</b></p>
+    ${rows}
+    <button class="btn" style="margin-top:12px;background:rgba(139,115,85,.2);color:var(--text);box-shadow:none" onclick="closeAllModals()">关闭</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});
+}
+
+// ═══════ Energy Enforcement ═══════
+function consumeEnergy(amount){
+  if(state.energy<amount){
+    toast('⚡ 体力不足! 去商店补充');
+    return false;
+  }
+  state.energy=Math.max(0,state.energy-amount);
+  return true;
+}
+
+// ═══════ Auto-spawn ═══════
 let spawnInterval;
 function startAutoSpawn(){
   spawnInterval=setInterval(()=>{
     const empties=findEmpty();
-    if(empties.length===0){spawnItem();return;}
+    if(empties.length===0)return; // Don't spawn when full
     if(Math.random()<0.4)spawnItem();
   },15000);
 }
 
-// ═══════════════════════════════════════════
-// Energy Recovery
-// ═══════════════════════════════════════════
+// ═══════ Energy Recovery ═══════
 setInterval(()=>{
   if(state.energy<100){
     state.energy=Math.min(100,state.energy+1);

@@ -1,84 +1,623 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>全局点击捕获</title>
-    <style>
-        * {margin:0;padding:0}
-        body {overflow:hidden;}
-        #gameBox {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
-        }
-        #clickMask {
-            position: absolute;
-            left:0;top:0;
-            width:100%;height:100%;
-            background: transparent;
-            z-index: 9999;
-            pointer-events: auto;
-        }
-        .ball {
-            width:100px;height:100px;border-radius:50%;
-            position:absolute;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ClickMaster · 点击大师</title>
+<style>
+:root {
+  --c1:#FF6B35;--c2:#4ECDC4;--c3:#2ECC71;--c4:#E74C3C;--c5:#F1C40F;
+  --bg:#F8F9FA;--card:#FFFFFF;--text:#1A1A2E;--sub:#888;
+  --glass:rgba(255,255,255,.85);--shadow:0 4px 20px rgba(0,0,0,.08);
+  --radius:20px;--ease:cubic-bezier(.34,1.56,.64,1);
+  --tile-s:64px;
+}
+[data-theme="dark"] {
+  --bg:#1A1A2E;--card:rgba(255,255,255,.06);--text:#E0E0E0;--sub:#999;
+  --glass:rgba(30,30,50,.85);--shadow:0 4px 20px rgba(0,0,0,.3);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);overflow:hidden;
+  height:100dvh;width:100vw;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+  transition:background .4s,color .4s;
+}
+#app{height:100%;display:flex;flex-direction:column;max-width:500px;margin:0 auto;position:relative}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;z-index:10}
+.header .logo{font-size:20px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(135deg,var(--c1),var(--c2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .icons{display:flex;gap:8px}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:none;background:var(--glass);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s,background .2s;backdrop-filter:blur(10px)}
+.icon-btn:active{transform:scale(.9)}
+
+/* Mode tabs */
+.tabs{display:flex;gap:6px;padding:0 16px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:8px 14px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid rgba(128,128,128,.2);background:var(--glass);color:var(--sub);cursor:pointer;transition:all .2s;backdrop-filter:blur(10px);flex-shrink:0}
+.tab.active{background:var(--c1);color:#fff;border-color:var(--c1)}
+
+/* Game area */
+#gameArea{flex:1;position:relative;margin:0 12px;border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;min-height:280px}
+#gameCanvas{position:absolute;inset:0}
+#gameInner{position:absolute;inset:0;z-index:2;pointer-events:none}
+#target{pointer-events:auto}
+#target{
+  width:var(--tile-s);height:var(--tile-s);border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#fff 10%,var(--c1) 100%);
+  box-shadow:0 4px 12px rgba(0,0,0,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;color:#fff;cursor:pointer;
+  transition:transform .1s;
+  pointer-events:auto;
+  -webkit-user-drag:none;user-drag:none;
+  -webkit-touch-callout:none;
+}
+#target:active{transform:scale(.92)}
+#target.hit{animation:targetHit .2s var(--ease)}
+@keyframes targetHit{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* Wait indicator */
+#waitHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;pointer-events:none;animation:breathe 1.8s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.3;transform:scale(.95)}50%{opacity:1;transform:scale(1.05)}}
+
+/* Timer ring */
+#timerRing{position:absolute;top:8px;right:8px;width:52px;height:52px}
+#timerRing svg{transform:rotate(-90deg)}
+#timerRing .bg{fill:none;stroke:rgba(128,128,128,.15);stroke-width:4}
+#timerRing .fg{fill:none;stroke:var(--c1);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .3s linear}
+#timerText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
+
+/* Stats bar */
+#statsBar{
+  display:flex;gap:8px;padding:8px 16px;z-index:5;
+  justify-content:center;flex-wrap:wrap;
+}
+.stat-card{
+  flex:1;min-width:70px;max-width:120px;padding:10px 12px;border-radius:16px;
+  background:var(--glass);backdrop-filter:blur(10px);
+  box-shadow:var(--shadow);text-align:center;
+}
+.stat-card .val{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat-card .lbl{font-size:10px;color:var(--sub);margin-top:2px}
+.stat-card.combo .val{color:var(--c1)}
+.stat-card.cps .val{color:var(--c2)}
+.stat-card.time .val.warn{color:var(--c4);animation:pulse .5s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+/* Start button */
+#btnStart{
+  width:calc(100% - 32px);margin:8px 16px 16px;padding:14px;
+  border-radius:28px;border:none;background:linear-gradient(135deg,var(--c1),var(--c2));
+  color:#fff;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:1px;
+  box-shadow:0 4px 16px rgba(255,107,53,.3);transition:transform .15s,box-shadow .2s;
+}
+#btnStart:active{transform:scale(.96)}
+#btnStart:disabled{opacity:.5;pointer-events:none}
+#btnStart.hint{animation:btnGlow 2s ease-in-out infinite}
+@keyframes btnGlow{0%,100%{box-shadow:0 4px 16px rgba(255,107,53,.3)}50%{box-shadow:0 4px 30px rgba(255,107,53,.6)}}
+
+/* Overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s}
+.overlay .panel{background:var(--card);border-radius:24px;width:85%;max-width:340px;padding:24px 20px 32px;animation:popIn .4s var(--ease);box-shadow:0 12px 40px rgba(0,0,0,.15)}
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+.panel .grade{font-size:64px;text-align:center;margin-bottom:8px;animation:gradePop .6s var(--ease)}
+@keyframes gradePop{0%{transform:scale(0)rotate(-20deg);opacity:0}100%{transform:scale(1)rotate(0);opacity:1}}
+.panel h2{text-align:center;font-size:24px;margin-bottom:16px}
+.result-row{display:flex;gap:12px;margin-bottom:12px;justify-content:center;flex-wrap:wrap}
+.result-item{flex:1;min-width:70px;text-align:center;padding:12px 8px;border-radius:16px;background:var(--bg)}
+.result-item .rv{font-size:26px;font-weight:800}
+.result-item .rl{font-size:10px;color:var(--sub)}
+.panel .actions{display:flex;gap:10px;margin-top:16px}
+.panel .actions button{flex:1;padding:14px;border-radius:24px;border:none;font-size:15px;font-weight:600;cursor:pointer;transition:transform .15s}
+.panel .actions button:active{transform:scale(.95)}
+.btn-main{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff}
+.btn-sub{background:var(--bg);color:var(--text)}
+
+/* Leaderboard */
+.lb-panel{background:var(--card);border-radius:24px;width:90%;max-width:380px;padding:20px 16px;animation:popIn .4s var(--ease);box-shadow:0 12px 40px rgba(0,0,0,.15);max-height:75vh;overflow-y:auto}
+.lb-panel h2{text-align:center;font-size:18px;margin-bottom:12px}
+.lb-row{display:flex;align-items:center;gap:8px;padding:10px 8px;border-radius:14px;margin-bottom:4px;background:var(--bg);font-size:13px}
+.lb-rank{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0}
+.lb-rank.gold{background:linear-gradient(135deg,#FFD700,#FFA500);color:#fff}
+.lb-rank.silver{background:linear-gradient(135deg,#C0C0C0,#A0A0A0);color:#fff}
+.lb-rank.bronze{background:linear-gradient(135deg,#CD7F32,#A0522D);color:#fff}
+.lb-rank.normal{background:rgba(128,128,128,.15);color:var(--sub)}
+.lb-name{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-cps{font-weight:800;color:var(--c1);min-width:36px;text-align:right}
+.lb-grade{font-weight:700;font-size:11px;min-width:24px;text-align:center}
+.lb-time{font-size:10px;color:var(--sub);min-width:50px;text-align:right}
+.lb-empty{text-align:center;color:var(--sub);padding:20px;font-size:14px}
+.lb-footer{padding:12px 0 4px;text-align:center;font-size:11px;color:var(--sub)}
+.lb-footer b{color:var(--text)}
+
+/* Floating score */
+.float-text{position:fixed;pointer-events:none;z-index:50;font-size:24px;font-weight:800;color:var(--c5);text-shadow:0 2px 4px rgba(0,0,0,.3);animation:floatUp .6s ease-out forwards}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)scale(1)}100%{opacity:0;transform:translateY(-60px)scale(1.3)}}
+
+/* Ripple */
+.ripple{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.6);animation:rippleOut .4s ease-out forwards;pointer-events:none}
+@keyframes rippleOut{0%{width:0;height:0;opacity:1}100%{width:120px;height:120px;opacity:0;margin-left:-60px;margin-top:-60px}}
+
+/* Particles */
+.particle{position:fixed;pointer-events:none;z-index:49;font-size:18px;animation:particleFly .5s ease-out forwards}
+@keyframes particleFly{0%{opacity:1;transform:translate(0,0)rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy))rotate(var(--dr))}}
+
+/* Combo flash */
+#comboFlash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:60;font-size:72px;font-weight:900;color:var(--c5);text-shadow:0 4px 20px rgba(241,196,15,.5);animation:comboPop .5s ease-out forwards;opacity:0}
+@keyframes comboPop{0%{opacity:1;transform:scale(.5)}50%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(1.5)}}
+
+/* Canvas background */
+canvas{position:absolute;inset:0;z-index:1;pointer-events:none}
+
+/* Mobile adaptations */
+@media(max-width:380px){
+  :root{--tile-s:56px}
+  .header{padding:8px 12px 4px}.tabs{padding:0 10px 6px}
+  .tab{padding:6px 10px;font-size:11px}
+  .stat-card{padding:8px}
+  .stat-card .val{font-size:18px}
+}
+
+/* A11y */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
 </head>
 <body>
-<div id="gameBox">
-    <div class="ball" style="background:red;left:100px;top:200px"></div>
-    <div class="ball" style="background:blue;left:220px;top:260px"></div>
-    <div id="clickMask"></div>
+<div id="app">
+  <div class="header">
+    <span class="logo">🎯 ClickMaster</span>
+    <div class="icons">
+      <button class="icon-btn" id="btnLeaderboard" aria-label="排行榜" title="排行榜">🏆</button>
+      <button class="icon-btn" id="btnTheme" aria-label="切换主题" title="切换主题">🌓</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-mode="0">⚡ 极速点击</button>
+    <button class="tab" data-mode="1">🎯 反应测试</button>
+    <button class="tab" data-mode="2">💎 精准打击</button>
+    <button class="tab" data-mode="3">🔥 连击挑战</button>
+  </div>
+
+  <div id="gameArea">
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameInner">
+      <div id="waitHint">👆</div>
+      <div id="target" style="display:none" role="button" aria-label="点击目标" tabindex="0" draggable="false"></div>
+    </div>
+    <div id="timerRing" style="display:none">
+      <svg width="52" height="52" viewBox="0 0 52 52">
+        <circle class="bg" cx="26" cy="26" r="23"/>
+        <circle class="fg" id="timerCircle" cx="26" cy="26" r="23" stroke-dasharray="144.5" stroke-dashoffset="0"/>
+      </svg>
+      <div id="timerText">10</div>
+    </div>
+  </div>
+
+  <div id="statsBar">
+    <div class="stat-card cps"><div class="val" id="cpsVal">0</div><div class="lbl">CPS</div></div>
+    <div class="stat-card combo"><div class="val" id="comboVal">0</div><div class="lbl">连击</div></div>
+    <div class="stat-card time"><div class="val" id="timeVal">10s</div><div class="lbl">剩余</div></div>
+    <div class="stat-card"><div class="val" id="scoreVal">0</div><div class="lbl">得分</div></div>
+  </div>
+
+  <button id="btnStart" class="hint">开始游戏</button>
 </div>
 
+<div id="comboFlash"></div>
+
 <script>
-const mask = document.getElementById('clickMask');
-const balls = document.querySelectorAll('.ball');
+// ═══════ State ═══════
+const MODES = [
+  {name:'极速点击',icon:'⚡',desc:'10秒内尽可能多地点击目标',duration:10,hasTarget:true,hasFake:false},
+  {name:'反应测试',icon:'🎯',desc:'目标出现后尽快点击',duration:30,hasTarget:true,hasFake:false,reactMode:true},
+  {name:'精准打击',icon:'💎',desc:'只点真目标，别点假的',duration:15,hasTarget:true,hasFake:true},
+  {name:'连击挑战',icon:'🔥',desc:'保持连击不断',duration:20,hasTarget:true,hasFake:false,comboMode:true},
+];
 
-let ballList = [];
-balls.forEach(item => {
-    const rect = item.getBoundingClientRect();
-    ballList.push({
-        dom: item,
-        x: rect.left,
-        y: rect.top,
-        w: rect.width,
-        h: rect.height,
-        r: rect.width / 2
-    })
-})
+let mode = 0;
+let running = false;
+let score = 0, clicks = 0, combo = 0, maxCombo = 0, misses = 0;
+let timeLeft = 10, totalTime = 10;
+let timer = null, spawnTimer = null;
+let history = JSON.parse(localStorage.getItem('clickmaster_history')||'[]');
+let theme = localStorage.getItem('clickmaster_theme')||'light';
 
-mask.addEventListener('mousedown', function(e){
-    handleClick(e.clientX, e.clientY);
-})
-mask.addEventListener('touchstart', function(e){
-    e.preventDefault();
-    Array.from(e.touches).forEach(touch=>{
-        handleClick(touch.clientX, touch.clientY);
-    })
-}, {passive:false})
+// ═══════ DOM refs ═══════
+const $=s=>document.querySelector(s);
+const target = $('#target');
+const waitHint = $('#waitHint');
+const gameArea = $('#gameArea');
+const timerRing = $('#timerRing');
+const timerCircle = $('#timerCircle');
+const timerText = $('#timerText');
+const btnStart = $('#btnStart');
+const comboFlash = $('#comboFlash');
+const gameCanvas = $('#gameCanvas');
+const ctx = gameCanvas.getContext('2d');
 
-function handleClick(px, py){
-    console.log('点击坐标', px, py);
-    for(let i = ballList.length -1; i >=0; i--){
-        const b = ballList[i];
-        const dx = px - (b.x + b.r);
-        const dy = py - (b.y + b.r);
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if(dist < b.r){
-            onBallClick(b.dom);
-            break;
-        }
+// ═══════ Theme ═══════
+function setTheme(t){
+  theme=t;document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('clickmaster_theme',t);
+  $('#btnTheme').textContent=t==='dark'?'☀️':'🌙';
+}
+setTheme(theme);
+$('#btnTheme').onclick=()=>setTheme(theme==='dark'?'light':'dark');
+
+// ═══════ Mode tabs ═══════
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.onclick=()=>{
+    if(running) return;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    mode=parseInt(tab.dataset.mode);
+  };
+});
+
+// ═══════ Canvas background ═══════
+function resizeCanvas(){
+  const r=gameArea.getBoundingClientRect();
+  gameCanvas.width=r.width;gameCanvas.height=r.height;
+}
+resizeCanvas();window.addEventListener('resize',resizeCanvas);
+
+let bgParticles=[];
+for(let i=0;i<30;i++) bgParticles.push({x:Math.random(),y:Math.random(),r:Math.random()*2+1,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.3});
+
+function drawBG(){
+  ctx.clearRect(0,0,gameCanvas.width,gameCanvas.height);
+  bgParticles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=1;if(p.x>1)p.x=0;if(p.y<0)p.y=1;if(p.y>1)p.y=0;
+    ctx.beginPath();
+    ctx.arc(p.x*gameCanvas.width,p.y*gameCanvas.height,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(78,205,196,${p.o})`;
+    ctx.fill();
+  });
+  if(!running) requestAnimationFrame(drawBG);
+}
+drawBG();
+
+// ═══════ Effects ═══════
+function spawnRipple(x,y){
+  const r=document.createElement('div');r.className='ripple';
+  r.style.left=x+'px';r.style.top=y+'px';gameArea.appendChild(r);
+  setTimeout(()=>r.remove(),400);
+}
+function spawnFloat(x,y,text){
+  const f=document.createElement('div');f.className='float-text';
+  f.textContent=text;f.style.left=x+'px';f.style.top=y+'px';
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),600);
+}
+function spawnParticles(x,y,count=6){
+  const emojis=['✨','💫','⭐','🌟','💥'];
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div');p.className='particle';
+    p.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+    p.style.left=x+'px';p.style.top=y+'px';
+    p.style.setProperty('--dx',(Math.random()-.5)*120+'px');
+    p.style.setProperty('--dy',-(Math.random()*80+20)+'px');
+    p.style.setProperty('--dr',(Math.random()-.5)*360+'deg');
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(),500);
+  }
+}
+function showComboFlash(cnt){
+  if(cnt<10) return;
+  comboFlash.textContent=cnt<20?`🔥 ${cnt}`:`💥 ${cnt}`;
+  comboFlash.style.animation='none';
+  comboFlash.offsetHeight;
+  comboFlash.style.animation='comboPop .5s ease-out forwards';
+  setTimeout(()=>comboFlash.style.opacity='0',500);
+}
+function pulseEdge(){
+  gameArea.style.boxShadow='0 0 0 0 rgba(255,107,53,.4)';
+  gameArea.offsetHeight;
+  gameArea.style.transition='box-shadow .3s ease-out';
+  gameArea.style.boxShadow='0 0 0 12px rgba(255,107,53,0)';
+  setTimeout(()=>{gameArea.style.boxShadow='var(--shadow)';gameArea.style.transition='';},300);
+}
+
+// ═══════ Target management ═══════
+function showTarget(){
+  target.style.display='flex';
+  const area=gameArea.getBoundingClientRect();
+  const s=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-s'));
+  const pad=20;
+  const mx=area.width-s-pad*2,my=area.height-s-pad*2-50;
+  const x=pad+Math.random()*mx,y=pad+Math.random()*my;
+  target.style.position='absolute';
+  target.style.left=x+'px';target.style.top=y+'px';
+  target.style.animation='none';target.offsetHeight;
+  target.style.animation='targetIn .2s cubic-bezier(.34,1.56,.64,1)';
+  // Randomize color hue
+  const hue=Math.floor(Math.random()*360);
+  target.style.background=`radial-gradient(circle at 40% 35%,#fff 10%,hsl(${hue},80%,55%) 100%)`;
+}
+function hideTarget(){target.style.display='none'}
+
+// Fake target for precision mode
+function showFake(){
+  const fake=document.createElement('div');
+  fake.style.cssText=`
+    position:absolute;width:var(--tile-s);height:var(--tile-s);border-radius:50%;
+    background:radial-gradient(circle at 40% 35%,#fff 10%,#E74C3C 100%);
+    box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;
+    font-size:28px;cursor:pointer;animation:targetIn .2s cubic-bezier(.34,1.56,.64,1);
+    opacity:.85;filter:brightness(.9);
+  `;
+  fake.textContent='❌';
+  const area=gameArea.getBoundingClientRect();
+  const s=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-s'));
+  const pad=20,mx=area.width-s-pad*2,my=area.height-s-pad*2-50;
+  fake.style.left=(pad+Math.random()*mx)+'px';
+  fake.style.top=(pad+Math.random()*my)+'px';
+  fake.onclick=(e)=>{e.stopPropagation();onFakeHit(fake)};
+  gameArea.appendChild(fake);
+  setTimeout(()=>{if(fake.parentNode)fake.remove()},800+Math.random()*400);
+}
+function onFakeHit(el){
+  el.style.animation='none';el.offsetHeight;
+  el.style.transform='scale(1.3)';el.style.opacity='0';el.style.filter='brightness(2)';
+  setTimeout(()=>el.remove(),200);
+  misses++;combo=0;
+  updateStats();
+  if(navigator.vibrate) navigator.vibrate([30,30,30]);
+  spawnFloat(parseFloat(el.style.left),parseFloat(el.style.top),'-1 ❌');
+}
+
+// ═══════ Game logic ═══════
+function onTargetHit(e){
+  if(!running||target.style.display==='none') return;
+  e.stopPropagation();
+  const rect=target.getBoundingClientRect();
+  const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+
+  clicks++;combo++;
+  if(combo>maxCombo) maxCombo=combo;
+  score+=1+Math.floor(combo/5);
+
+  // Effects
+  target.classList.add('hit');
+  setTimeout(()=>target.classList.remove('hit'),200);
+  spawnRipple(e.clientX-rect.left,e.clientY-rect.top);
+  spawnFloat(cx,cy,combo>1?`+${1+Math.floor(combo/5)} Combo`: '+1');
+  if(combo%5===0) spawnParticles(cx,cy);
+  if(combo%10===0){showComboFlash(combo);pulseEdge()}
+  if(navigator.vibrate) navigator.vibrate(10);
+
+  updateStats();
+
+  const cfg=MODES[mode];
+  if(cfg.comboMode && combo===0){/* combo broken - handled in misses */}
+
+  // Move target for speed mode
+  if(!cfg.reactMode){
+    hideTarget();
+    setTimeout(showTarget,50);
+  }else{
+    hideTarget();
+    waitHint.style.display='flex';
+    const delay=500+Math.random()*2000;
+    setTimeout(()=>{if(running){waitHint.style.display='none';showTarget()}},delay);
+  }
+}
+
+function onMissClick(e){
+  if(!running) return;
+  if(e.target===target||e.target.closest('#gameArea')===null) return;
+  combo=0;misses++;
+  updateStats();
+}
+
+target.addEventListener('pointerdown',onTargetHit);
+target.addEventListener('dragstart',e=>e.preventDefault());
+gameArea.addEventListener('pointerdown',onMissClick);
+// Keyboard support
+target.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')onTargetHit(e)});
+
+function updateStats(){
+  const elapsed=totalTime-timeLeft;
+  const cps=elapsed>0?(clicks/elapsed).toFixed(1):0;
+  $('#cpsVal').textContent=cps;
+  $('#comboVal').textContent=combo;
+  $('#scoreVal').textContent=score;
+  $('#timeVal').textContent=String(Math.ceil(Math.max(0,timeLeft))).padStart(3,'0')+'s';
+  if(Math.ceil(timeLeft)<=3&&timeLeft>0) $('#timeVal').classList.add('warn');
+  else $('#timeVal').classList.remove('warn');
+}
+
+// ═══════ Timer ═══════
+function updateTimerRing(){
+  const pct=timeLeft/totalTime;
+  timerCircle.style.strokeDashoffset=(144.5*(1-pct)).toFixed(1);
+  timerText.textContent=String(Math.ceil(timeLeft)).padStart(3,'0');
+  const hue=120*pct;
+  timerCircle.style.stroke=`hsl(${hue},80%,50%)`;
+}
+
+// ═══════ Start / Stop ═══════
+function startGame(){
+  if(running) return;
+  const cfg=MODES[mode];
+  running=true;score=0;clicks=0;combo=0;maxCombo=0;misses=0;
+  timeLeft=cfg.duration;totalTime=cfg.duration;
+
+  updateStats();updateTimerRing();
+  btnStart.textContent='游戏中...';btnStart.disabled=true;btnStart.classList.remove('hint');
+  timerRing.style.display='block';
+  waitHint.style.display=cfg.reactMode?'flex':'none';
+
+  if(!cfg.reactMode) showTarget();
+  else{hideTarget();setTimeout(()=>{if(running){waitHint.style.display='none';showTarget()}},500+Math.random()*1500)}
+
+  // Fake targets for precision mode
+  if(cfg.hasFake){
+    spawnTimer=setInterval(()=>{if(running)showFake()},1000);
+  }
+
+  // Countdown
+  timer=setInterval(()=>{
+    timeLeft-=.1;
+    updateTimerRing();
+    updateStats();
+    if(timeLeft<=0){
+      timeLeft=0;endGame();
     }
+  },100);
 }
 
-function onBallClick(ballDom){
-    console.log('命中球体', ballDom);
-    ballDom.style.transform = 'scale(0.8)';
-    setTimeout(() => ballDom.style.transform = '', 150);
+function endGame(){
+  running=false;
+  clearInterval(timer);clearInterval(spawnTimer);
+  hideTarget();waitHint.style.display='none';
+  timerRing.style.display='none';
+  updateStats();
+  btnStart.textContent='再来一局';btnStart.disabled=false;btnStart.classList.add('hint');
+
+  const cfg=MODES[mode];
+  const elapsed=cfg.duration;
+  const cps=(clicks/elapsed).toFixed(1);
+  const accuracy=cfg.hasFake?(clicks/(clicks+misses||1)*100).toFixed(0):100;
+
+  // Grade
+  let grade,gradeEmoji;
+  if(cps>=8) {grade='S';gradeEmoji='🏆';}
+  else if(cps>=6) {grade='A';gradeEmoji='🥇';}
+  else if(cps>=4) {grade='B';gradeEmoji='🥈';}
+  else if(cps>=2) {grade='C';gradeEmoji='🥉';}
+  else {grade='D';gradeEmoji='💪';}
+
+  // Save history
+  history.push({mode,date:Date.now(),score,clicks,cps:parseFloat(cps),maxCombo,accuracy:parseInt(accuracy),grade});
+  if(history.length>50) history.shift();
+  localStorage.setItem('clickmaster_history',JSON.stringify(history));
+
+  // Save to leaderboard
+  saveToLeaderboard(cps, grade, clicks, maxCombo);
+
+  // Show results
+  showResults(grade,gradeEmoji,cps,accuracy);
 }
+
+function showResults(grade,emoji,cps,accuracy){
+  const avgCps=history.length>1?(history.slice(0,-1).reduce((s,h)=>s+h.cps,0)/(history.length-1)).toFixed(1):cps;
+  const trend=parseFloat(cps)>=parseFloat(avgCps)?'🟢':'🔴';
+
+  const ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML=`
+    <div class="panel">
+      <div class="grade">${emoji}</div>
+      <h2>${grade} 级 · ${MODES[mode].name}</h2>
+      <div class="result-row">
+        <div class="result-item"><div class="rv">${cps}</div><div class="rl">CPS ${trend}均${avgCps}</div></div>
+        <div class="result-item"><div class="rv">${clicks}</div><div class="rl">点击数</div></div>
+        <div class="result-item"><div class="rv">${maxCombo}</div><div class="rl">最大连击</div></div>
+        ${MODES[mode].hasFake?`<div class="result-item"><div class="rv">${accuracy}%</div><div class="rl">准确率</div></div>`:''}
+      </div>
+      <div class="actions">
+        <button class="btn-main" id="btnReplay">🔄 再玩一次</button>
+        <button class="btn-sub" id="btnShare">📤 分享成绩</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  ov.onclick=e=>{if(e.target===ov)ov.remove()};
+  ov.querySelector('#btnReplay').onclick=()=>{ov.remove();startGame()};
+  ov.querySelector('#btnShare').onclick=()=>{
+    const text=`🎯 ClickMaster ${grade}级!\nCPS:${cps} | 连击:${maxCombo} | ${MODES[mode].name}\n${accuracy!==100?`准确率:${accuracy}%`:'完美!'}`;
+    if(navigator.share){navigator.share({title:'ClickMaster 成绩',text})}
+    else{navigator.clipboard.writeText(text).then(()=>alert('已复制成绩到剪贴板!')).catch(()=>prompt('复制此文字分享:',text))}
+  };
+}
+
+// ═══════ Visitor ID ═══════
+let visitorId = localStorage.getItem('clickmaster_visitor');
+if(!visitorId){
+  visitorId = '游客'+String(Math.floor(Math.random()*9000)+1000);
+  localStorage.setItem('clickmaster_visitor', visitorId);
+}
+
+// ═══════ Leaderboard ═══════
+let leaderboard = JSON.parse(localStorage.getItem('clickmaster_leaderboard')||'[]');
+
+function saveToLeaderboard(cps, grade, clicks, maxCombo){
+  leaderboard.push({
+    id: visitorId,
+    mode, cps: parseFloat(cps), grade,
+    clicks, maxCombo,
+    date: Date.now()
+  });
+  // Keep top 100, sorted by CPS desc
+  leaderboard.sort((a,b)=>b.cps-a.cps);
+  if(leaderboard.length>100) leaderboard.length=100;
+  localStorage.setItem('clickmaster_leaderboard', JSON.stringify(leaderboard));
+}
+
+function showLeaderboard(){
+  const ov=document.createElement('div'); ov.className='overlay';
+  const top10=leaderboard.slice(0,15);
+  const myBest=leaderboard.filter(e=>e.id===visitorId).sort((a,b)=>b.cps-a.cps)[0];
+  const rankClass=['gold','silver','bronze'];
+  let rows=top10.map((e,i)=>{
+    const rc=i<3?rankClass[i]:'normal';
+    const emoji=i===0?'👑':i===1?'🥈':i===2?'🥉':'';
+    const ago=formatTime(e.date);
+    const isMe=e.id===visitorId;
+    return `<div class="lb-row"${isMe?' style="border:1px solid var(--c1)"':''}>
+      <div class="lb-rank ${rc}">${emoji||(i+1)}</div>
+      <div class="lb-name">${e.id}${isMe?' ⭐':''}</div>
+      <div class="lb-grade">${e.grade}</div>
+      <div class="lb-cps">${e.cps}</div>
+      <div class="lb-time">${ago}</div>
+    </div>`;
+  }).join('');
+  if(!rows) rows='<div class="lb-empty">还没有记录，快来玩一局吧 🎮</div>';
+  ov.innerHTML=`<div class="lb-panel">
+    <h2>🏆 点击大师排行榜</h2>
+    ${rows}
+    <div class="lb-footer">我是 <b>${visitorId}</b>${myBest?' · 最佳 CPS <b>'+myBest.cps+'</b> ('+myBest.grade+'级)':''}</div>
+    <button class="btn-main" style="width:100%;margin-top:10px;padding:12px;border-radius:20px;border:none;font-weight:600;cursor:pointer" onclick="this.closest('.overlay').remove()">关闭</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});
+}
+
+function formatTime(ts){
+  const diff=Date.now()-ts;
+  if(diff<6e4) return '刚刚';
+  if(diff<36e5) return Math.floor(diff/6e4)+'分钟前';
+  if(diff<864e5) return Math.floor(diff/36e5)+'小时前';
+  return Math.floor(diff/864e5)+'天前';
+}
+
+document.getElementById('btnLeaderboard').onclick=showLeaderboard;
+
+// ═══════ Keyboard shortcuts ═══════
+document.addEventListener('keydown',e=>{
+  if(e.key===' '&&!running){e.preventDefault();if(!document.querySelector('.overlay'))startGame();return;}
+  if(e.key==='Escape'){document.querySelectorAll('.overlay').forEach(o=>o.remove());return;}
+  if(!running&&e.key>='1'&&e.key<='4'){
+    mode=parseInt(e.key)-1;
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===mode));
+  }
+});
+
+// ═══════ Start ═══════
+btnStart.onclick=()=>{
+  if(running||document.querySelector('.overlay')) return;
+  startGame();
+};
 </script>
 </body>
 </html>

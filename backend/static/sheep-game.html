@@ -73,15 +73,16 @@ body{
 .footer{font-size:10px;color:#aaa;padding:0 0 12px}
 
 /* Overlay */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn .3s}
-.overlay .modal{background:#fff;border-radius:20px;padding:32px 24px;text-align:center;max-width:300px;width:90%;animation:popIn .35s cubic-bezier(.34,1.56,.64,1)}
-.overlay .modal .m-icon{font-size:56px;margin-bottom:12px}
-.overlay .modal h2{font-size:20px;margin-bottom:8px;color:var(--dark)}
-.overlay .modal p{font-size:13px;color:#888;margin-bottom:20px;line-height:1.6}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s}
+.overlay .modal{background:#fff;border-radius:24px;padding:28px 22px 36px;text-align:center;max-width:320px;width:85%;animation:popIn .4s cubic-bezier(.34,1.56,.64,1);box-shadow:0 12px 40px rgba(0,0,0,.15)}
+.overlay .modal .m-icon{font-size:56px;margin-bottom:8px}
+.overlay .modal h2{font-size:22px;margin-bottom:6px;color:var(--dark)}
+.overlay .modal p{font-size:13px;color:#888;margin-bottom:18px;line-height:1.6}
 .overlay .modal .btn{width:100%}
 
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 
 /* Particle */
 .particle{position:fixed;pointer-events:none;font-size:24px;z-index:200;animation:particleFly .6s ease-out forwards}
@@ -371,29 +372,21 @@ function renderSlots(){
 
 // ═══════ Game Logic ═══════
 function onTileClick(tile, event){
-  // Block if slots already full
-  if(slots.length >= 7) return;
+  if(slots.length >= MAX_SLOTS) return;
   
-  // Save undo state
   undoStack.push({tileId: tile.id, slotsBefore: [...slots.map(s=>({type:s.type}))]});
-  
-  // Add to slots
   slots.push({type: tile.type});
-  
-  // Remove from board
   tiles = tiles.filter(t => t.id !== tile.id);
   tile.el.classList.add('flash');
   setTimeout(() => tile.el.remove(), 400);
   
-  // Check for 3-match
   checkMatch();
-  
-  // Re-render
+  // Force immediate repaint with requestAnimationFrame
   renderBoard();
-  renderSlots();
-  
-  // Check game state
-  checkGameState();
+  requestAnimationFrame(()=>{
+    renderSlots();
+    checkGameState();
+  });
 }
 
 function checkMatch(){
@@ -431,10 +424,12 @@ function checkMatch(){
   }
   
   if(matched){
-    // Animate and re-render
-    const slotEls=document.getElementById('slot-bar').querySelectorAll('.slot');
-    slotEls.forEach(el=>{if(el.classList.contains('filled'))el.classList.add('match')});
-    setTimeout(renderSlots,350);
+    // Schedule re-render to sync with animation frame
+    requestAnimationFrame(()=>{
+      renderSlots();
+      // Double render after animation to ensure cleanup
+      setTimeout(renderSlots, 400);
+    });
   }
 }
 
@@ -556,6 +551,7 @@ function toast(msg){
 }
 
 function showOverlay(icon, title, msg, isWin){
+  if(document.querySelector('.overlay')) return;
   const overlay=document.createElement('div');
   overlay.className='overlay';
   const nextBtn = isWin ? `<button class="btn btn-green" onclick="this.closest('.overlay').remove();nextLevel()">▶️ 进入第 ${level} 关</button>` : '';
