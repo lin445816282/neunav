@@ -99,11 +99,11 @@ body{
 
 <div class="header">
   <div class="title"><span>🐑</span>羊了个羊<span>🌾</span></div>
-  <div class="sub">点击牌面收集到槽位 · 3张相同自动消除</div>
+  <div class="sub" id="levelName">🌱 新手村 · 第1关</div>
 </div>
 
 <div class="score-bar">
-  <div class="score-item"><div class="label">🏆 最高</div><div class="value" id="best">0</div></div>
+  <div class="score-item"><div class="label">🏆 最高关</div><div class="value" id="best">1</div></div>
   <div class="score-item"><div class="label">📊 剩余</div><div class="value" id="remain">0</div></div>
   <div class="score-item"><div class="label">🔥 连击</div><div class="value" id="streak">0</div></div>
 </div>
@@ -140,99 +140,169 @@ body{
 // ═══════ Game State ═══════
 const TYPES = ['🐑','🐏','🐐','🐄','🐖','🐓','🦆','🐕','🐈','🐇','🌽','🥕','🍎','🍞','⭐','🌙'];
 const BOARD_W = 340, BOARD_H = 300;
-const TILE_S = 48; // tile size
+const TILE_S = 48;
+const MAX_SLOTS = 7;
 
-let tiles = [];        // {id, type, x, y, layer, el}
-let slots = [];        // [{type, slotIdx}]
+// Level config: each level uses #types × 3 tiles
+const LEVELS = [
+  {types:5, layers:1, name:'🌱 新手村'},   // 1: 15 tiles, 1 layer
+  {types:6, layers:1, name:'🌿 绿草地'},   // 2: 18 tiles
+  {types:7, layers:2, name:'🌾 麦田'},     // 3: 21 tiles, 2 layers
+  {types:8, layers:2, name:'🍀 幸运草'},   // 4: 24 tiles
+  {types:10,layers:2, name:'🌻 向日葵'},   // 5: 30 tiles
+  {types:12,layers:3, name:'🌳 大森林'},   // 6: 36 tiles, 3 layers
+  {types:14,layers:3, name:'🏔️ 高山上'},  // 7: 42 tiles
+  {types:15,layers:3, name:'🌌 星空顶'},   // 8: 45 tiles
+];
+
+let level = parseInt(localStorage.getItem('sheep_level')||'1');
+let tiles = [];
+let slots = [];
 let streak = 0;
-let bestScore = 0;
+let bestLevel = parseInt(localStorage.getItem('sheep_best_level')||'1');
 let totalCleared = 0;
 let tools = {shuffle:3, undo:3, peek:3};
 let undoStack = [];
 
-// Load best
-bestScore = parseInt(localStorage.getItem('sheep_best')||'0');
-document.getElementById('best').textContent = bestScore;
+document.getElementById('best').textContent = bestLevel;
+
+// ═══════ Solvability Check ═══════
+// Greedy simulation: try to clear all tiles given slot limit
+function isSolvable(tiles, numTypes){
+  const sim = tiles.map(t=>({...t}));
+  const simSlots = [];
+  let attempts = 0;
+  const maxAttempts = tiles.length * 3;
+  
+  while(sim.length > 0 && attempts < maxAttempts){
+    attempts++;
+    // Find an uncovered tile whose type already has 2 in slots
+    let found = false;
+    for(const t of sim){
+      if(isCoveredSim(t, sim)) continue;
+      const count = simSlots.filter(s=>s===t.type).length;
+      if(count >= 2){
+        // Match! Remove this tile and clear the 2 from slots
+        simSlots.push(t.type);
+        // Remove matching tiles from slots
+        let removed = 0;
+        for(let i=simSlots.length-1;i>=0;i--){
+          if(simSlots[i]===t.type && removed<2){simSlots.splice(i,1);removed++;}
+        }
+        sim.splice(sim.indexOf(t),1);
+        found = true;
+        break;
+      }
+    }
+    if(found) continue;
+    
+    // No match available — must pick a new tile
+    // Check if slots would overflow
+    if(simSlots.length >= MAX_SLOTS - 1) return false;
+    
+    // Pick an uncovered tile (prefer one that matches an existing slot count)
+    let best = null;
+    for(const t of sim){
+      if(isCoveredSim(t, sim)) continue;
+      const count = simSlots.filter(s=>s===t.type).length;
+      if(count >= 1){best=t;break;} // prefer partial match
+      if(!best) best=t;
+    }
+    if(!best) return false; // all covered, stuck
+    
+    simSlots.push(best.type);
+    sim.splice(sim.indexOf(best),1);
+    
+    // Check if 3-match in slots
+    const slotCounts = {};
+    simSlots.forEach(s=>slotCounts[s]=(slotCounts[s]||0)+1);
+    for(const [type,cnt] of Object.entries(slotCounts)){
+      if(cnt>=3){
+        let r=0;
+        for(let i=simSlots.length-1;i>=0;i--){
+          if(simSlots[i]===type&&r<3){simSlots.splice(i,1);r++;}
+        }
+      }
+    }
+  }
+  return sim.length === 0;
+}
+
+function isCoveredSim(tile, tilesArr){
+  for(const t of tilesArr){
+    if(t.layer <= tile.layer) continue;
+    const dx=Math.abs(t.x-tile.x),dy=Math.abs(t.y-tile.y);
+    if(dx<TILE_S*0.75&&dy<TILE_S*0.75)return true;
+  }
+  return false;
+}
 
 // ═══════ Tile Generation ═══════
 function generateTiles(){
-  tiles = [];
-  // Use 14 types × 3 = 42 tiles
-  const usedTypes = [...TYPES].sort(()=>Math.random()-.5).slice(0,15);
-  // Each type appears 3 times
-  let pool = [];
-  usedTypes.forEach(t => {for(let i=0;i<3;i++)pool.push(t)});
-  // Shuffle
+  const cfg = LEVELS[Math.min(level-1, LEVELS.length-1)];
+  const numTypes = cfg.types;
+  const numLayers = cfg.layers;
+  
+  // Retry until solvable (max 50 attempts)
+  for(let attempt=0; attempt<50; attempt++){
+    tiles=[];
+    const usedTypes=[...TYPES].sort(()=>Math.random()-.5).slice(0,numTypes);
+    let pool=[];
+    usedTypes.forEach(t=>{for(let i=0;i<3;i++)pool.push(t)});
+    for(let i=pool.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [pool[i],pool[j]]=[pool[j],pool[i]];
+    }
+    
+    let id=0;
+    const total=pool.length;
+    
+    // Calculate tiles per layer
+    const perLayer=Math.floor(total/numLayers);
+    let remaining=total;
+    
+    for(let l=0;l<numLayers;l++){
+      const count=(l===numLayers-1)?remaining:perLayer;
+      remaining-=count;
+      const offset=l*20;
+      const cols=Math.ceil(Math.sqrt(count*1.5));
+      const rows=Math.ceil(count/cols);
+      const spacing=Math.min(56,Math.floor((BOARD_W-offset*2)/cols));
+      const startX=offset+Math.floor((BOARD_W-offset*2-cols*spacing)/2);
+      const startY=offset+Math.floor((BOARD_H-offset*2-rows*spacing)/2);
+      
+      for(let i=0;i<count;i++){
+        const c=i%cols,r=Math.floor(i/cols);
+        tiles.push({
+          id:id++,type:pool.pop(),
+          x:startX+c*spacing,y:startY+r*spacing,
+          layer:l
+        });
+      }
+    }
+    
+    // Solvability check (skip for 1-layer which is always solvable)
+    if(numLayers===1||isSolvable([...tiles],numTypes)){
+      return; // valid layout
+    }
+  }
+  // Fallback: regenerate with fewer layers if needed
+  generateTilesFallback();
+}
+
+function generateTilesFallback(){
+  tiles=[];
+  const usedTypes=[...TYPES].sort(()=>Math.random()-.5).slice(0,5);
+  let pool=[];
+  usedTypes.forEach(t=>{for(let i=0;i<3;i++)pool.push(t)});
   for(let i=pool.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
     [pool[i],pool[j]]=[pool[j],pool[i]];
   }
-
-  // Layer layout: spread tiles across 3 layers
-  // Layer 0 (bottom): 5-6 cols × 3-4 rows
-  // Layer 1 (middle): smaller grid, offset
-  // Layer 2 (top): few tiles scattered
-
-  const total = pool.length;
-  
-  // Layer sizes (bottom-heavy)
-  const l0Count = Math.floor(total * 0.45); // ~19
-  const l1Count = Math.floor(total * 0.33); // ~14
-  const l2Count = total - l0Count - l1Count; // ~9
-
-  let id = 0;
-  
-  // Layer 0: 6×5 grid-ish
-  const l0Cols = 6, l0Rows = 5;
-  const l0Spots = [];
-  for(let r=0;r<l0Rows;r++)
-    for(let c=0;c<l0Cols;c++)
-      l0Spots.push({x:20+c*52, y:20+r*52});
-  // Shuffle spots, pick needed count
-  for(let i=l0Spots.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [l0Spots[i],l0Spots[j]]=[l0Spots[j],l0Spots[i]];
-  }
-  for(let i=0;i<Math.min(l0Count, l0Spots.length);i++){
-    tiles.push({id:id++, type:pool.pop(), x:l0Spots[i].x, y:l0Spots[i].y, layer:0});
-  }
-
-  // Layer 1: 5×4, offset by half tile
-  const l1Cols = 5, l1Rows = 4;
-  const l1Spots = [];
-  for(let r=0;r<l1Rows;r++)
-    for(let c=0;c<l1Cols;c++)
-      l1Spots.push({x:46+c*52, y:46+r*52});
-  for(let i=l1Spots.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [l1Spots[i],l1Spots[j]]=[l1Spots[j],l1Spots[i]];
-  }
-  for(let i=0;i<Math.min(l1Count, l1Spots.length);i++){
-    tiles.push({id:id++, type:pool.pop(), x:l1Spots[i].x, y:l1Spots[i].y, layer:1});
-  }
-
-  // Layer 2: scattered
-  const l2Cols = 4, l2Rows = 3;
-  const l2Spots = [];
-  for(let r=0;r<l2Rows;r++)
-    for(let c=0;c<l2Cols;c++)
-      l2Spots.push({x:72+c*52, y:72+r*52});
-  for(let i=l2Spots.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [l2Spots[i],l2Spots[j]]=[l2Spots[j],l2Spots[i]];
-  }
-  for(let i=0;i<Math.min(l2Count, l2Spots.length);i++){
-    tiles.push({id:id++, type:pool.pop(), x:l2Spots[i].x, y:l2Spots[i].y, layer:2});
-  }
-
-  // If any remaining, add as layer 3 center tiles
-  const l3Spots = [
-    {x:98,y:98},{x:150,y:98},{x:124,y:150},{x:98,y:150},{x:150,y:150}
-  ];
-  let li = 0;
-  while(pool.length > 0 && li < l3Spots.length){
-    tiles.push({id:id++, type:pool.pop(), x:l3Spots[li].x, y:l3Spots[li].y, layer:3});
-    li++;
+  let id=0;
+  const cols=6,spacing=Math.min(52,Math.floor(BOARD_W/cols));
+  for(let i=0;i<pool.length;i++){
+    tiles.push({id:id++,type:pool.pop(),x:20+(i%cols)*spacing,y:20+Math.floor(i/cols)*48,layer:0});
   }
 }
 
@@ -327,68 +397,65 @@ function onTileClick(tile, event){
 }
 
 function checkMatch(){
-  // Find 3 of same type in slots
-  const counts = {};
-  slots.forEach(s => {
-    counts[s.type] = (counts[s.type]||0) + 1;
-  });
-  
-  for(const [type, count] of Object.entries(counts)){
-    if(count >= 3){
-      // Remove 3 of this type with animation
-      let removed = 0;
-      slots = slots.filter(s => {
-        if(s.type === type && removed < 3){removed++; return false;}
-        return true;
-      });
-      
-      // Animate slots
-      const slotEls = document.getElementById('slot-bar').querySelectorAll('.slot');
-      let matched = 0;
-      slots.forEach((s, i) => {
-        if(i < 7 && s.type === type && matched < 3){
-          // should not happen since we filtered
-        }
-      });
-      
-      // Flash all filled slots
-      slotEls.forEach(el => {if(el.classList.contains('filled')) el.classList.add('match')});
-      
-      // Score & streak
-      streak++;
-      totalCleared += 3;
-      if(streak > 1) toast(`${streak}连击! 🔥`);
-      
-      // Particles
-      spawnParticles(type);
-      
-      // Update best
-      const totalCleared = 42 - tiles.length;
-      if(totalCleared > bestScore){
-        bestScore = totalCleared;
-        localStorage.setItem('sheep_best', bestScore);
-        document.getElementById('best').textContent = bestScore;
-      }
-      document.getElementById('streak').textContent = streak;
-      
-      // Re-render after animation
-      setTimeout(renderSlots, 350);
-      return;
+  let matched = false;
+  // Loop: handle sequential matches (removing one set might reveal another)
+  while(true){
+    const counts = {};
+    slots.forEach(s => {counts[s.type]=(counts[s.type]||0)+1});
+    let found = null;
+    for(const [type,count] of Object.entries(counts)){
+      if(count>=3){found=type;break;}
     }
+    if(!found) break;
+    matched=true;
+    
+    // Remove all 3 of this type
+    let removed=0;
+    slots=slots.filter(s=>{
+      if(s.type===found&&removed<3){removed++;return false;}
+      return true;
+    });
+    
+    // Score & streak
+    streak++;totalCleared+=3;
+    if(streak>1) toast(`${streak}连击! 🔥`);
+    spawnParticles(found);
+    document.getElementById('streak').textContent=streak;
+    
+    // Update best
+    if(level>bestLevel){
+      bestLevel=level;
+      localStorage.setItem('sheep_best_level',bestLevel);
+      document.getElementById('best').textContent=bestLevel;
+    }
+  }
+  
+  if(matched){
+    // Animate and re-render
+    const slotEls=document.getElementById('slot-bar').querySelectorAll('.slot');
+    slotEls.forEach(el=>{if(el.classList.contains('filled'))el.classList.add('match')});
+    setTimeout(renderSlots,350);
   }
 }
 
 function checkGameState(){
   if(tiles.length === 0 && slots.length === 0){
-    // Win!
-    setTimeout(() => showOverlay('🎉', '恭喜通关!', `你就是羊了个羊的天选之人!\n消除了 ${totalCleared} 张牌`, true), 500);
+    // Win! Advance level
+    level++;
+    if(level > bestLevel){
+      bestLevel = level;
+      localStorage.setItem('sheep_best_level', bestLevel);
+      document.getElementById('best').textContent = bestLevel;
+    }
+    localStorage.setItem('sheep_level', level);
+    setTimeout(() => showOverlay('🎉', '恭喜通关!',
+      `通过第 ${level-1} 关!\n消除 ${totalCleared} 张牌`,
+      true), 500);
   }else if(tiles.length === 0 && slots.length > 0 && !hasMatch()){
-    // Stuck - all tiles collected but no match
-    setTimeout(() => showOverlay('😵', '卡住了!', `牌已取完但槽内无三消\n消除了 ${totalCleared} 张牌`, false), 500);
-  }else if(slots.length >= 7){
-    // Check if any slot combination can make 3
+    setTimeout(() => showOverlay('😵', '卡住了!', `牌已取完但槽内无三消`, false), 500);
+  }else if(slots.length >= MAX_SLOTS){
     if(!hasMatch()){
-      setTimeout(() => showOverlay('💔', '游戏结束', `槽位已满!\n消除了 ${totalCleared} 张牌`, false), 500);
+      setTimeout(() => showOverlay('💔', '游戏结束', `槽位已满! 消除 ${totalCleared} 张`, false), 500);
     }
   }
 }
@@ -491,18 +558,39 @@ function toast(msg){
 function showOverlay(icon, title, msg, isWin){
   const overlay=document.createElement('div');
   overlay.className='overlay';
+  const nextBtn = isWin ? `<button class="btn btn-green" onclick="this.closest('.overlay').remove();nextLevel()">▶️ 进入第 ${level} 关</button>` : '';
   overlay.innerHTML=`<div class="modal">
     <div class="m-icon">${icon}</div>
     <h2>${title}</h2>
-    <p>${msg.replace(/\n/g,'<br>')}</p>
-    <button class="btn btn-green" onclick="this.closest('.overlay').remove();restart()">🔄 再来一局</button>
+    <p>${msg.replace(/\\n/g,'<br>')}</p>
+    ${nextBtn}
+    <button class="btn btn-outline" style="margin-top:8px;width:100%" onclick="this.closest('.overlay').remove();restart()">🔄 重玩本关</button>
   </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
 }
 
-function restart(){
+function nextLevel(){
   document.querySelectorAll('.overlay').forEach(o=>o.remove());
+  startLevel();
+}
+
+function startLevel(){
+  slots=[];
+  streak=0;
+  totalCleared=0;
+  undoStack=[];
+  tools={shuffle:3, undo:3, peek:3};
+  document.getElementById('streak').textContent='0';
+  const cfg = LEVELS[Math.min(level-1, LEVELS.length-1)];
+  document.getElementById('levelName').textContent = cfg.name+' · 第'+level+'关';
+  generateTiles();
+  renderBoard();
+  renderSlots();
+}
+
+function restart(){
+  // Re-generate same level
   slots=[];
   streak=0;
   totalCleared=0;
@@ -526,9 +614,7 @@ function adaptSize(){
 window.addEventListener('resize', adaptSize);
 
 // ═══════ Init ═══════
-generateTiles();
-renderBoard();
-renderSlots();
+startLevel();
 adaptSize();
 </script>
 </body>
