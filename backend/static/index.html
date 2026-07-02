@@ -191,15 +191,31 @@ body.drag-scrolling { overflow: hidden !important; }
 
 .bm-open, .bm-restart {
   position: absolute; top: 10px;
-  font-size: 18px; opacity: 0; transition: opacity .2s;
-  cursor: pointer; background: none; border: none;
-  color: var(--accent); padding: 2px 4px;
+  font-size: 11px; padding: 3px 9px; border-radius: 10px;
+  cursor: pointer; font-family: 'Noto Serif SC', serif;
+  transition: opacity .2s, transform .15s;
 }
-.bm-open { right: 24px; }
-.bm-restart { right: 64px; }
+.bm-open {
+  right: 8px;
+  background: var(--accent); color: #fff;
+  border: none; opacity: 0.7;
+}
+.bm-restart {
+  right: 56px;
+  background: transparent; color: var(--accent);
+  border: 1.5px solid var(--accent); opacity: 0.65;
+}
+
+/* 暗色模式下提亮按钮 */
+[data-theme="dark"] .bm-open {
+  opacity: 0.85; box-shadow: 0 0 8px rgba(201,168,76,0.25);
+}
+[data-theme="dark"] .bm-restart {
+  opacity: 0.8; border-color: var(--accent);
+}
 .bookmark-card:hover .bm-open,
+.bookmark-card:active .bm-open { opacity: 0.85; transform: scale(1.05); }
 .bookmark-card:hover .bm-restart,
-.bookmark-card:active .bm-open,
 .bookmark-card:active .bm-restart { opacity: 0.7; }
 .bm-restart.spinning {
   animation: spin .8s linear infinite; opacity: 1;
@@ -364,8 +380,8 @@ body.drag-scrolling { overflow: hidden !important; }
       <span class="bm-icon">{{bm.icon}}</span>
       <div class="bm-title">{{bm.title}}<span class="bm-visit">×{{bm.visit_count}}</span></div>
       <div class="bm-url">{{bm.url}}</div>
-      <button class="bm-restart" v-if="getServiceId(bm)" @click.stop="restartSvc(bm,$event)" title="重启">🔄</button>
-      <button class="bm-open" @click.stop="openUrl(bm)" title="打开">🔗</button>
+      <button class="bm-open" @click.stop="openUrl(bm)" title="打开">打开 ›</button>
+      <button class="bm-restart" v-if="getServiceId(bm)" @click.stop="restartSvc(bm,$event)" title="重启">↻ 重启</button>
       <button class="bm-edit" @click.stop="startEditBm(bm)">✎</button>
       <div class="bm-actions" v-if="selectedBmId === bm.id">
         <button @click.stop="startEditBm(bm)">✎ 编辑</button>
@@ -706,9 +722,10 @@ const app = createApp({
     }
 
     async function openUrl(bm) {
-      await api('/api/bookmarks/' + bm.id + '/visit', { method: 'PUT' });
+      // 立即打开（必须在 await 之前，否则浏览器拦截弹窗）
       window.open(bm.url, '_blank');
-      await loadAll();
+      // 异步记录访问
+      api('/api/bookmarks/' + bm.id + '/visit', { method: 'PUT' }).then(() => loadAll());
     }
 
     // ── 服务重启 ──
@@ -718,7 +735,6 @@ const app = createApp({
       'ct256.cn/remind': 'remind',
       'ct256.cn/purchase': 'purchase',
       'ct256.cn/fund/': 'fund',
-      'ct256.cn/funds-v2': 'stock',
       'ct256.cn/push': 'push',
       'ct256.cn/guardian': 'guardian',
     };
