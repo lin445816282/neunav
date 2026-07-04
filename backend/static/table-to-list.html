@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>表格行转列</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f5f5;min-height:100vh;display:flex;flex-direction:column}
+header{background:#fff;padding:14px 16px;text-align:center;border-bottom:1px solid #eee}
+header h1{font-size:18px;color:#333}
+header p{font-size:12px;color:#999;margin-top:4px}
+.main{flex:1;padding:16px;max-width:600px;width:100%;margin:0 auto}
+.section{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.section h3{font-size:14px;color:#666;margin-bottom:8px}
+textarea{width:100%;min-height:120px;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:15px;font-family:monospace;resize:vertical;outline:none;line-height:1.8}
+textarea:focus{border-color:#4da6ff}
+.sep-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:#666;margin-bottom:12px}
+.sep-btn{padding:6px 14px;border-radius:16px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-size:13px}
+.sep-btn.active{background:#4da6ff;color:#fff;border-color:#4da6ff}
+.output-area{background:#f9f9f9;border-radius:8px;padding:12px;min-height:40px;font-family:monospace;font-size:14px;white-space:pre-wrap;word-break:break-all;line-height:1.8}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn{padding:10px 20px;border-radius:8px;border:none;font-size:14px;cursor:pointer;font-weight:600}
+.btn-primary{background:#4da6ff;color:#fff;flex:1}
+.btn-copy{background:#f0f0f0;color:#666}
+.btn:active{opacity:.8}
+.info{font-size:12px;color:#999;margin-top:6px;text-align:center}
+footer{text-align:center;padding:12px;font-size:11px;color:#ccc}
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 表格行 → 转列</h1>
+  <p>粘贴一行多列数据，转成每行一个值</p>
+</header>
+
+<div class="main">
+  <div class="section">
+    <h3>📥 粘贴一行数据</h3>
+    <div class="sep-row">
+      <span>分隔符:</span>
+      <button class="sep-btn active" data-sep="tab" onclick="setSep('tab',this)">Tab ↹</button>
+      <button class="sep-btn" data-sep="," onclick="setSep(',',this)">逗号 ,</button>
+      <button class="sep-btn" data-sep=" " onclick="setSep(' ',this)">空格</button>
+      <button class="sep-btn" data-sep="|" onclick="setSep('|',this)">竖线 |</button>
+      <button class="sep-btn" data-sep="custom" onclick="setSep('custom',this)">自定义</button>
+    </div>
+    <input id="customSep" type="text" placeholder="自定义分隔符" style="display:none;width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;font-size:13px" oninput="convert()">
+    <textarea id="input" placeholder="从 Excel/WPS 复制一行，粘贴到这里&#10;例如：张三	25	北京	工程师" oninput="convert()"></textarea>
+  </div>
+
+  <div class="section">
+    <h3>📤 每行一个值 <span id="count" style="font-weight:400;font-size:12px;color:#999"></span></h3>
+    <div class="output-area" id="output"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="doCopy()">📋 复制结果</button>
+      <button class="btn btn-copy" onclick="clearAll()">🗑 清空</button>
+    </div>
+  </div>
+</div>
+
+<footer>表格行转列 · 一键拆分</footer>
+
+<script>
+let currentSep = '\t'
+
+function setSep(sep, btn) {
+  document.querySelectorAll('.sep-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  if (sep === 'tab') currentSep = '\t'
+  else if (sep === 'custom') currentSep = 'custom'
+  else currentSep = sep
+  document.getElementById('customSep').style.display = sep === 'custom' ? 'block' : 'none'
+  convert()
+}
+
+function convert() {
+  const input = document.getElementById('input').value
+  const sep = currentSep === 'custom' ? document.getElementById('customSep').value || '|' : currentSep
+  if (!input.trim()) {
+    document.getElementById('output').textContent = ''
+    document.getElementById('count').textContent = ''
+    return
+  }
+  const parts = input.split(sep).map(s => s.trim()).filter(s => s)
+  document.getElementById('output').textContent = parts.join('\n')
+  document.getElementById('count').textContent = `(${parts.length}个)`
+}
+
+async function doCopy() {
+  const text = document.getElementById('output').textContent
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    const btn = event.target
+    btn.textContent = '✅ 已复制'
+    setTimeout(() => btn.textContent = '📋 复制结果', 1500)
+  } catch {
+    // fallback
+    const ta = document.createElement('textarea')
+    ta.value = text
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+  }
+}
+
+function clearAll() {
+  document.getElementById('input').value = ''
+  document.getElementById('output').textContent = ''
+  document.getElementById('count').textContent = ''
+}
+</script>
+</body>
+</html>
