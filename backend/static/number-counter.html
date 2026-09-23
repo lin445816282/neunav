@@ -157,6 +157,7 @@
         <div class="button-group">
             <button onclick="addChip()">➕ 添加筹码</button>
             <button class="secondary" onclick="resetChip()">🔄 重置筹码</button>
+            <button class="secondary" onclick="subtractMin()">✂️ 除最小</button>
             <button class="secondary" onclick="copyChip()">📋 复制筹码</button>
         </div>
         <div id="coldest8Result"></div>
@@ -541,6 +542,38 @@
                 saveChip();
             }
 
+            // 除最小：49 个号都有筹码时，整体减掉最小筹码，最小的归零（剔除）
+            function subtractMin() {
+                // 判断 01~49 是否都有筹码
+                let hasAll = true;
+                for (let i = 1; i <= 49; i++) {
+                    const key = i < 10 ? '0' + i : String(i);
+                    if (!chipCounts.has(key)) { hasAll = false; break; }
+                }
+                if (!hasAll) {
+                    alert('需 01~49 共 49 个号码都有筹码才能执行「除最小」（当前 ' + chipCounts.size + ' 个号）');
+                    return;
+                }
+                // 取最小筹码
+                let min = Infinity;
+                chipCounts.forEach(function (v) { if (v < min) min = v; });
+                // 整体减最小筹码，归零的剔除
+                const removed = [];
+                chipCounts.forEach(function (v, n) {
+                    const newVal = Math.round((v - min) * 100) / 100;
+                    if (newVal <= 0) removed.push(n);
+                    else chipCounts.set(n, newVal);
+                });
+                removed.forEach(function (n) { chipCounts.delete(n); });
+                chipLogList.push({
+                    raw: '✂️ 除最小（整体减 ' + min + '，' + removed.length + ' 号归零）',
+                    val: '-' + min,
+                    time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+                });
+                renderChip();
+                saveChip();
+            }
+
             function copyChip() {
                 if (chipCounts.size === 0) return;
                 const byVal = new Map();
@@ -797,6 +830,7 @@
             window.copyWithCount = copyWithCount;
             window.addChip = addChip;
             window.resetChip = resetChip;
+            window.subtractMin = subtractMin;
             window.copyChip = copyChip;
             window.extractColdest = extractColdest;
             window.toggleZodiac = toggleZodiac;
