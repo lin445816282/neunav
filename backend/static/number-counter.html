@@ -175,7 +175,7 @@
             </thead>
             <tbody></tbody>
         </table>
-        <div id="chipTotal" style="font-weight:700;color:#e65100;font-size:14px;margin:8px 0;text-align:right">汇总结果 0</div>
+        <div id="chipTotal" style="font-weight:700;color:#e65100;font-size:14px;margin:8px 0;text-align:right">汇总结果 0 · 号码合计 0 个</div>
         <div id="chipEmptyTip" class="chip-empty">暂无筹码，请在上方输入号码和筹码数后点击「添加筹码」</div>
 
         <h4 style="font-size:14px;color:#1a2a4a;margin:16px 0 8px">添加记录</h4>
@@ -461,7 +461,7 @@
                 chipCounts.forEach(function (val) { chipTotal += val; });
                 chipTotal = Math.round(chipTotal * 100) / 100;
                 const totalEl = document.getElementById('chipTotal');
-                if (totalEl) totalEl.textContent = '汇总结果 ' + chipTotal;
+                if (totalEl) totalEl.textContent = '汇总结果 ' + chipTotal + ' · 号码合计 ' + chipCounts.size + ' 个';
                 document.getElementById('chipEmptyTip').style.display =
                     chipCounts.size === 0 ? 'block' : 'none';
 
@@ -489,7 +489,7 @@
                 document.getElementById('chipCount').value = '';
                 document.getElementById('chipEmptyTip').style.display = 'block';
                 const totalEl2 = document.getElementById('chipTotal');
-                if (totalEl2) totalEl2.textContent = '汇总结果 0';
+                if (totalEl2) totalEl2.textContent = '汇总结果 0 · 号码合计 0 个';
                 saveChip();
             }
 
@@ -515,6 +515,7 @@
                 chipCounts.forEach(function (val) { total += val; });
                 total = Math.round(total * 100) / 100;
                 lines.push('汇总结果 ' + total);
+                lines.push('号码合计 ' + chipCounts.size + ' 个');
                 copyToClipboard(lines.join('\n'));
             }
 
