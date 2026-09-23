@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Seedance 2.5 提示词校准器</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.container{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:22px;text-align:center;margin:20px 0 4px;color:#1a1a2e}
+.subtitle{text-align:center;font-size:13px;color:#999;margin-bottom:20px}
+
+.card{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);border:1px solid #eee}
+.card-title{font-size:13px;color:#888;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px;justify-content:space-between}
+.card-title .icon{font-size:16px}
+
+/* Prompt输入 */
+textarea{width:100%;border:1px solid #e0e0e0;border-radius:10px;padding:12px;font-size:14px;font-family:inherit;resize:vertical;min-height:140px;line-height:1.6;background:#fafafa;transition:border .2s}
+textarea:focus{outline:none;border-color:#1989fa;background:#fff}
+.char-count{font-size:12px;color:#aaa;text-align:right;margin-top:4px}
+.preset-btns{display:flex;gap:6px;margin-top:8px}
+.btn-xs{padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid #e0e0e0;background:#fff;color:#666;cursor:pointer;transition:all .2s}
+.btn-xs:hover{border-color:#1989fa;color:#1989fa}
+
+/* 素材区 */
+.material-tabs{display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;margin-bottom:10px}
+.mtab{flex:1;padding:7px 4px;text-align:center;font-size:12px;background:#fafafa;border:none;cursor:pointer;color:#999;transition:all .2s;border-right:1px solid #e0e0e0}
+.mtab:last-child{border-right:none}
+.mtab.active{background:#1989fa;color:#fff;font-weight:600}
+.mtab .badge{font-size:10px;margin-left:2px;opacity:.8}
+.dropzone-sm{border:1px dashed #d0d5dd;border-radius:10px;padding:16px;text-align:center;font-size:12px;color:#aaa;cursor:pointer;transition:all .2s;min-height:44px;display:flex;align-items:center;justify-content:center;gap:4px}
+.dropzone-sm:hover{border-color:#1989fa;color:#1989fa}
+.dropzone-sm input{display:none}
+.file-list{font-size:11px;color:#888;margin-top:8px}
+.file-item{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f5f5f5}
+.file-item .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+.file-item .info{color:#aaa;flex-shrink:0;margin-left:8px}
+.file-item .err{color:#ff4d4f;flex-shrink:0;margin-left:8px}
+.file-item .ok{color:#36b37e;flex-shrink:0;margin-left:8px}
+.file-item button{background:none;border:none;color:#ff4d4f;cursor:pointer;font-size:14px;padding:2px 4px}
+
+/* 参数区 */
+.param-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.param-item{flex:1;min-width:70px}
+.param-item label{display:block;font-size:12px;color:#999;margin-bottom:4px}
+.param-item select,.param-item input{width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fafafa;transition:border .2s}
+.param-item select:focus,.param-item input:focus{outline:none;border-color:#1989fa;background:#fff}
+.param-item input{font-size:16px}
+.param-item select:disabled,.param-item input:disabled{background:#f0f0f0;color:#bbb;cursor:not-allowed}
+.check-row{display:flex;gap:16px;align-items:center;margin-top:12px;font-size:13px;color:#555;flex-wrap:wrap}
+.check-row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.check-row input[type=checkbox]{accent-color:#1989fa;width:16px;height:16px}
+
+/* 任务类型标识 */
+.task-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.task-t2v{background:#e8f5e9;color:#2e7d32}
+.task-edit{background:#fce4ec;color:#c62828}
+.task-extend{background:#fff3e0;color:#e65100}
+.task-first{background:#e3f2fd;color:#1565c0}
+.task-ref{background:#f3e5f5;color:#7b1fa2}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 24px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:#1989fa;color:#fff;width:100%}
+.btn-primary:hover{background:#1676e0}
+.btn-ghost{background:#f5f6f7;color:#555}
+
+/* 报告 */
+.report-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.score-circle{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;flex-shrink:0}
+.score-pass{background:#e8f5e9;color:#2e7d32;border:3px solid #2e7d32}
+.score-warn{background:#fff8e1;color:#f57f17;border:3px solid #f57f17}
+.score-fail{background:#fce4ec;color:#c62828;border:3px solid #c62828}
+.score-label{font-size:14px;font-weight:600}
+.dim-item{margin-bottom:12px}
+.dim-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.dim-name{font-size:13px;font-weight:500}
+.dim-score{font-size:18px;font-weight:700}
+.bar-track{height:6px;background:#e8e8ea;border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .4s}
+.bar-good{background:#36b37e}
+.bar-warn{background:#faad14}
+.bar-bad{background:#ff4d4f}
+
+.deduction{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:12px}
+.deduction h4{font-size:13px;color:#e65100;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.deduction-item{padding:3px 0;color:#666;line-height:1.5}
+.deduction-item .tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;margin-right:4px;font-weight:600}
+.tag-err{background:#fce4ec;color:#c62828}
+.tag-warn{background:#fff3e0;color:#e65100}
+.tag-info{background:#e3f2fd;color:#1565c0}
+
+.suggest{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:12px}
+.suggest h4{font-size:13px;color:#2e7d32;margin-bottom:6px}
+.suggest-item{padding:3px 0;color:#555;line-height:1.5}
+
+@media(max-width:420px){
+  .param-row{flex-direction:column;gap:8px}
+  .param-item{min-width:100%}
+  .check-row{flex-direction:column;align-items:flex-start;gap:8px}
+  .score-circle{width:52px;height:52px;font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎬 Seedance 2.5 提示词校准器</h1>
+  <p class="subtitle">6维公式分析，生成前零报错</p>
+
+  <!-- 输入区 -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📝</span>提示词<span style="font-weight:400;font-size:12px;color:#aaa">Ctrl+Enter 校准</span></div>
+    <textarea id="promptInput" placeholder="在此粘贴你的 Seedance 2.5 提示词...
+
+参考格式：主体 + 动作/事件 + 场景与环境 + 视觉风格 + 运镜/切镜 + 声音
+
+示例：电影级 hip-hop 音乐视频，海边场景。@图片1 的乐队在金色沙滩表演...(背景海浪声)(音效) {English: Hello}【字幕】"></textarea>
+    <div class="char-count"><span id="charCount">0</span> 字</div>
+    <div class="preset-btns">
+      <button class="btn-xs" onclick="loadExample()">📋 加载官方示例</button>
+      <button class="btn-xs" onclick="clearPrompt()">🗑 清空</button>
+      <span style="margin-left:auto;font-size:11px;color:#ccc">加载后手动点「执行校准」</span>
+    </div>
+  </div>
+
+  <!-- 素材区 -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📎</span>参考素材</div>
+    <div class="material-tabs" id="matTabs">
+      <button class="mtab active" data-tab="img">📷 图片 <span class="badge" id="imgCount">0/30</span></button>
+      <button class="mtab" data-tab="vid">🎥 视频 <span class="badge" id="vidCount">0/10</span></button>
+      <button class="mtab" data-tab="aud">🎵 音频 <span class="badge" id="audCount">0/10</span></button>
+    </div>
+    <div class="dropzone-sm" id="dropzone">
+      <span>📁</span> 拖拽素材到此处 或 点击选择
+      <input type="file" id="materialInput" accept="image/*,video/*,audio/*" multiple>
+    </div>
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <!-- 参数区 -->
+  <div class="card">
+    <div class="card-title"><span class="icon">⚙️</span>输出参数<span id="taskBadge" style="font-weight:400;font-size:12px"></span></div>
+    <div class="param-row">
+      <div class="param-item">
+        <label>ratio 宽高比</label>
+        <select id="ratio"><option value="adaptive" selected>adaptive（自动）</option><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="21:9">21:9</option></select>
+      </div>
+      <div class="param-item">
+        <label>duration 时长(秒)</label>
+        <input type="number" id="duration" value="10" min="-1" max="30" step="1">
+      </div>
+      <div class="param-item">
+        <label>resolution</label>
+        <select id="resolution"><option value="720p">720p</option><option value="480p">480p</option></select>
+      </div>
+      <div class="param-item">
+        <label>format</label>
+        <select id="format"><option value="mp4">mp4</option><option value="mov">mov</option></select>
+      </div>
+    </div>
+    <div class="check-row">
+      <label><input type="checkbox" id="genAudio" checked> 生成声音 (generate_audio)</label>
+      <label><input type="checkbox" id="watermark"> 添加水印</label>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btnCalibrate">🔍 执行校准</button>
+
+  <!-- 报告区 -->
+  <div id="reportSection" style="display:none">
+    <div class="card" style="margin-top:14px">
+      <div class="report-header">
+        <div>
+          <div class="score-label">校准总分</div>
+          <div style="font-size:12px;color:#aaa" id="taskTypeLabel"></div>
+        </div>
+        <div class="score-circle" id="scoreCircle">--</div>
+      </div>
+
+      <div id="dimBars"></div>
+
+      <div class="deduction" id="deductionBox" style="display:none">
+        <h4>⚠️ 扣分详情</h4>
+        <div id="deductionList"></div>
+      </div>
+
+      <div class="suggest" id="suggestBox" style="display:none">
+        <h4>💡 优化建议</h4>
+        <div id="suggestList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const promptInput=$('promptInput'), charCount=$('charCount');
+const ratio=$('ratio'), duration=$('duration'), resolution=$('resolution'), format=$('format');
+const genAudio=$('genAudio'), watermark=$('watermark');
+const btnCalibrate=$('btnCalibrate');
+const reportSection=$('reportSection'), scoreCircle=$('scoreCircle');
+const taskBadge=$('taskBadge'), taskTypeLabel=$('taskTypeLabel');
+const dimBars=$('dimBars'), deductionBox=$('deductionBox'), deductionList=$('deductionList');
+const suggestBox=$('suggestBox'), suggestList=$('suggestList');
+const dropzone=$('dropzone'), materialInput=$('materialInput');
+const fileList=$('fileList');
+
+// 素材存储
+let materials={img:[],vid:[],aud:[]};
+let activeTab='img';
+
+// 参数变化时自动重校准（防抖）
+let calibrateTimer;
+[ratio,duration,resolution,format,genAudio,watermark].forEach(el=>{
+  el.addEventListener('change',scheduleCalibrate);
+  if(el.tagName==='INPUT'&&el.type==='number')el.addEventListener('input',scheduleCalibrate);
+});
+
+function scheduleCalibrate(){
+  clearTimeout(calibrateTimer);
+  calibrateTimer=setTimeout(runCalibration,400);
+}
+
+promptInput.addEventListener('input',()=>{
+  charCount.textContent=promptInput.value.length;
+  scheduleCalibrate();
+});
+promptInput.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();runCalibration();}
+});
+
+// 素材标签切换
+$('matTabs').addEventListener('click',e=>{
+  const btn=e.target.closest('.mtab');
+  if(!btn)return;
+  activeTab=btn.dataset.tab;
+  [...$('matTabs').children].forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  materialInput.accept=activeTab==='img'?'image/*':activeTab==='vid'?'video/*':'audio/*';
+});
+
+// 拖拽
+dropzone.addEventListener('click',()=>materialInput.click());
+dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.style.borderColor='#1989fa'});
+dropzone.addEventListener('dragleave',()=>dropzone.style.borderColor='#d0d5dd');
+dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.style.borderColor='#d0d5dd';addFiles([...e.dataTransfer.files])});
+materialInput.addEventListener('change',()=>addFiles([...materialInput.files]));
+
+function addFiles(files){
+  const maxMap={img:30,vid:10,aud:10};
+  const mimeMap={img:['image/'],vid:['video/'],aud:['audio/']};
+  files.forEach(f=>{
+    let cat=null;
+    for(const[c,mimes]of Object.entries(mimeMap)){if(mimes.some(m=>f.type.startsWith(m))){cat=c;break}}
+    if(!cat)cat='img';
+    if(materials[cat].length>=maxMap[cat])return;
+    materials[cat].push({file:f,name:f.name,size:f.size,type:f.type,errors:[]});
+  });
+  renderFileList();
+  scheduleCalibrate();
+}
+
+function renderFileList(){
+  const all=[];
+  for(const[cat,arr]of Object.entries(materials)){
+    arr.forEach((f,i)=>{all.push({...f,cat,i})});
+  }
+  if(all.length===0){fileList.innerHTML='';updateCounts();return}
+  fileList.innerHTML=all.map(f=>{
+    const kb=(f.size/1024).toFixed(1);
+    let status='<span class="ok">✓</span>';
+    if(f.errors&&f.errors.length>0)status=`<span class="err" title="${f.errors.join('; ')}">${f.errors[0]}</span>`;
+    return `<div class="file-item">
+      <span class="name">${f.cat==='img'?'📷':f.cat==='vid'?'🎥':'🎵'} ${f.name}</span>
+      <span class="info">${kb} KB</span>
+      ${status}
+      <button onclick="removeFile('${f.cat}',${f.i})">×</button>
+    </div>`;
+  }).join('');
+  updateCounts();
+}
+
+function updateCounts(){
+  $('imgCount').textContent=`${materials.img.length}/30`;
+  $('vidCount').textContent=`${materials.vid.length}/10`;
+  $('audCount').textContent=`${materials.aud.length}/10`;
+}
+
+window.removeFile=function(cat,i){
+  materials[cat].splice(i,1);
+  renderFileList();
+  scheduleCalibrate();
+};
+
+// 加载示例
+window.loadExample=function(){
+  promptInput.value=`电影级 hip-hop / 说唱音乐视频，真实照片级质感，高端调性，海边场景。以@图片1构建画面：一支乐队在金色沙滩、海浪拍岸的岸边表演——一名主唱手握麦克风激情演唱，一名吉他手立于画面左侧，一名鼓手坐在后方敲击；辽阔的海岸线在身后展开，巨大而温暖的黄金时刻夕阳斜掠过沙滩。\n\n[0-5s] 低角度大远景定场，斯坦尼康在黄金夕照与海雾中缓缓推进，海浪在乐队身后翻涌。(激烈海浪声)<海鸥鸣叫>\n[5-10s] 红运动服主唱对镜头 RAP 特写，手持甩镜切入。{English: Hello} {中文: 你好}\n\n白平衡 4000K，青橙调色，35mm，浅景深，胶片颗粒，硬切转场。`;
+  charCount.textContent=promptInput.value.length;
+  scheduleCalibrate();
+};
+window.clearPrompt=function(){promptInput.value='';charCount.textContent='0';scheduleCalibrate()};
+
+// ===== 核心校准引擎 =====
+function runCalibration(){
+  const prompt=promptInput.value.trim();
+  if(!prompt){reportSection.style.display='none';return}
+
+  const params={ratio:ratio.value,duration:parseInt(duration.value)||-1,resolution:resolution.value,format:format.value,genAudio:genAudio.checked,watermark:watermark.checked};
+
+  // 素材统计
+  const matStats={imgCount:materials.img.length,vidCount:materials.vid.length,audCount:materials.aud.length};
+  const hasRef=matStats.imgCount+matStats.vidCount+matStats.audCount>0;
+
+  // 1. 任务类型判定
+  const taskType=detectTask(prompt,hasRef);
+
+  // 2. 参数联动锁
+  applyTaskLocks(taskType);
+
+  // 3. 6维评分
+  const d1=checkStructure(prompt);
+  const d2=checkReferences(prompt,matStats);
+  const d3=checkTaskKeywords(prompt,taskType);
+  const d4=checkTimeSegments(prompt,params.duration);
+  const d5=checkAudioNotation(prompt,params.genAudio);
+  const d6=checkParamConsistency(prompt,params);
+
+  const dims=[d1,d2,d3,d4,d5,d6];
+  const total=dims.reduce((s,d)=>s+d.score,0);
+  const maxTotal=dims.reduce((s,d)=>s+d.max,0);
+  const pct=Math.round(total/maxTotal*100);
+
+  // 4. 收集扣分+建议
+  const deductions=[],suggestions=[];
+  dims.forEach(d=>{if(d.deducts)deductions.push(...d.deducts);if(d.suggests)suggestions.push(...d.suggests)});
+
+  // 5. 同步/异步报错风险
+  checkFatalErrors(prompt,taskType,params,matStats,deductions);
+
+  // 6. 渲染
+  renderReport(pct,taskType,dims,deductions,suggestions);
+}
+
+// ---- 任务判定 ----
+function detectTask(prompt,hasRef){
+  const hasFF=prompt.includes('first_frame')||prompt.includes('last_frame');
+  const hasRV=prompt.includes('reference_video');
+  const editKW=/编辑视频|增加|加上|删除|去掉|修改|替换|改成/.test(prompt);
+  const extendKW=/向前延长|向后延长|延续|续写/.test(prompt);
+
+  if(hasFF)return'first';      // 首帧/首尾帧
+  if(hasRV&&editKW)return'edit';   // 视频编辑
+  if(hasRV&&extendKW)return'extend'; // 视频延长
+  if(hasRef||hasRV||prompt.includes('reference_image')||prompt.includes('reference_audio'))return'ref'; // 参考生视频
+  return't2v'; // 文生视频
+}
+
+function applyTaskLocks(taskType){
+  const locks={edit:{ratio:true,duration:true},extend:{ratio:true,duration:false},first:{ratio:true,duration:false},ref:{ratio:false,duration:false},t2v:{ratio:false,duration:false}};
+  const l=locks[taskType];
+  ratio.disabled=l.ratio;if(l.ratio)ratio.value='adaptive';
+  duration.disabled=l.duration;if(l.duration)duration.value=-1;
+
+  // 任务徽章
+  const labels={t2v:'文生视频',edit:'视频编辑',extend:'视频延长',first:'首帧/首尾帧',ref:'参考生视频'};
+  const classes={t2v:'task-t2v',edit:'task-edit',extend:'task-extend',first:'task-first',ref:'task-ref'};
+  taskBadge.innerHTML=`<span class="task-badge ${classes[taskType]}">${labels[taskType]}</span>`;
+  if(l.ratio||l.duration){
+    taskBadge.innerHTML+=` <span style="font-size:11px;color:#ff4d4f">(已锁定参数)</span>`;
+  }
+}
+
+// ---- ① 结构完整性 25分 ----
+function checkStructure(prompt){
+  let score=0;const max=25;const deducts=[],suggests=[];
+  const checks=[
+    {name:'主体',re:/人物|角色|动物|产品|乐队|人像|主角|表演者|歌手|舞者|演员/,pts:5},
+    {name:'动作',re:/行走|奔跑|飞行|演唱|跳舞|旋转|弹奏|说|打开|进入|表演|敲击|握住|迈步|冲|跳跃|翻|滑|推|拉/,pts:5},
+    {name:'场景',re:/海边|森林|室内|室外|城市|天空|地面|背景|周围|沙滩|海岸|海面|山谷|河|湖|房间|厅|馆|舞台|街/,pts:4},
+    {name:'风格',re:/电影级|写实|卡通|3D|广告|纪实|暗调|明亮|复古|蒸汽朋克|赛博|青橙|暖色|冷色|胶片|颗粒|调色|白平衡|摄影|超写实/,pts:4},
+    {name:'运镜',re:/推|拉|摇|移|跟|环绕|特写|远景|中景|近景|硬切|叠化|斯坦尼康|手持|推进|拉远|横移|轨道|上升|下沉|旋转镜头|跟拍|航拍/,pts:4},
+    {name:'声音',re:/[(){}\[\]【】<>]|音乐|音效|台词|旋律|背景音|鼓点|节拍|说唱|RAP|歌声|琴|吉他|鼓|乐器|海浪声|风声|脚步声/,pts:3}
+  ];
+  checks.forEach(c=>{
+    if(c.re.test(prompt)){score+=c.pts}
+    else{deducts.push({dim:'①',tag:'warn',text:`缺「${c.name}」描述 → -${c.pts}分`})}
+  });
+  // 三要素不全 → 额外警告
+  const basics=['主体','动作','场景'];
+  const missing=basics.filter((_,i)=>!checks[i].re.test(prompt));
+  if(missing.length>=2)suggests.push(`基础三要素缺${missing.join('、')}，建议至少补上主体+动作+场景描述`);
+  return{score,max,deducts,suggests,name:'① 结构完整性'};
+}
+
+// ---- ② 素材引用 15分 ----
+function checkReferences(prompt,stats){
+  let score=0;const max=15;const deducts=[],suggests=[];
+  const refs=[...prompt.matchAll(/@(图片|视频|音频)(\d+)/g)].map(m=>({type:m[1],num:parseInt(m[2]),full:m[0]}));
+  if(refs.length===0){score=6;return{score,max,deducts,suggests,name:'② 素材引用规范'}}
+  const typeMap={图片:'img',视频:'vid',音频:'aud'};
+  refs.forEach(r=>{
+    const cat=typeMap[r.type];
+    const actualCount=stats[cat+'Count'];
+    if(r.num>actualCount){
+      deducts.push({dim:'②',tag:'err',text:`@${r.type}${r.num} 超出实际上传数量(${actualCount}个) → 致命错误`});
+      score=-15;
+    }else{
+      // 检测引用后30字符内是否有职责描述
+      const idx=prompt.indexOf(r.full);
+      const after=prompt.substring(idx+r.full.length,idx+r.full.length+30).trim();
+      if(after.length>3&&!/^[，。！？、\s]*$/.test(after)){score+=3}
+      else{deducts.push({dim:'②',tag:'warn',text:`@${r.type}${r.num} 未说明职责 → -3分`})}
+    }
+  });
+  score=Math.max(score,-15);score=Math.min(score,15);
+  if(refs.length>0&&score<15&&!deducts.some(d=>d.tag==='err'))suggests.push('格式：@图片1 负责角色外貌和服装参考，@视频2 负责运镜和节奏');
+  return{score,max,deducts,suggests,name:'② 素材引用规范'};
+}
+
+// ---- ③ 任务关键词 20分 ----
+function checkTaskKeywords(prompt,taskType){
+  const max=20;const deducts=[];const suggests=[];
+  if(taskType==='edit'){
+    if(!/编辑视频|增加|加上|删除|去掉|修改|替换|改成/.test(prompt)){
+      deducts.push({dim:'③',tag:'err',text:'编辑任务缺必需关键词（编辑视频/增加/删除/修改/替换/改成）→ 0分 🔴异步报错风险'});
+      suggests.push('在提示词中至少包含一个编辑关键词，如："编辑视频：删除 @视频1中的背景水印"');
+      return{score:0,max,deducts,suggests,name:'③ 任务关键词'};
+    }
+  }
+  if(taskType==='extend'){
+    if(!/向前延长|向后延长|延续|续写/.test(prompt)){
+      deducts.push({dim:'③',tag:'err',text:'延长任务缺必需关键词（向前延长/向后延长/延续/续写）→ 0分 🔴异步报错风险'});
+      suggests.push('在提示词开头写明延长方向，如："向后延长 @视频1，新角色从天而降..."');
+      return{score:0,max,deducts,suggests,name:'③ 任务关键词'};
+    }
+  }
+  return{score:20,max,deducts,suggests,name:'③ 任务关键词'};
+}
+
+// ---- ④ 时间分段 15分 ----
+function checkTimeSegments(prompt,dur){
+  let score=0;const max=15;const deducts=[],suggests=[];
+  const segs=[...prompt.matchAll(/\[(\d+)[-~—](\d+)秒?\]|\[(\d+):(\d+)[-~—](\d+):(\d+)\]/g)];
+  if(segs.length>0){
+    score+=10;
+    let totalS=0;
+    segs.forEach(s=>{
+      if(s[1])totalS+=parseInt(s[2])-parseInt(s[1]);
+      else totalS+=(parseInt(s[5])*60+parseInt(s[6]))-(parseInt(s[3])*60+parseInt(s[4]));
+    });
+    if(dur>0){
+      const diff=Math.abs(totalS-dur);
+      if(diff===0)score+=5;
+      else if(diff<=2)score+=3;
+      else{deducts.push({dim:'④',tag:'warn',text:`时间段总和(${totalS}s)与 duration(${dur}s)不一致 → 扣分`})}
+    }else{score+=3}
+  }else{
+    if(dur<=10){score+=8;suggests.push('短视频分段可选，但建议标注关键时间点，如 [0-2s] 开场 [2-5s] 高潮')}
+    else{deducts.push({dim:'④',tag:'warn',text:`duration=${dur}s 但无时间分段 → -15分`})}
+  }
+  return{score,max,deducts,suggests,name:'④ 时间分段'};
+}
+
+// ---- ⑤ 声音标注 15分 ----
+function checkAudioNotation(prompt,genAudio){
+  let score=0;const max=15;const deducts=[],suggests=[];
+  if(/\([^)]{2,}\)/.test(prompt))score+=5;else deducts.push({dim:'⑤',tag:'warn',text:'未使用 () 标注音乐/旋律 → -5分'});
+  if(/<[^>]{2,}>/.test(prompt))score+=3;else deducts.push({dim:'⑤',tag:'info',text:'未使用 <> 标注音效（可选）'});
+  if(/\{[^}]{2,}\}/.test(prompt))score+=3;else deducts.push({dim:'⑤',tag:'info',text:'若有台词，建议用 {} 包裹'});
+  if(/【[^】]+】/.test(prompt))score+=1;
+  if(/(英语|日语|韩语|泰语|西班牙语|阿拉伯语|葡萄牙语|越南语|印尼语|马来语)[：:]\s*\{/.test(prompt))score+=3;
+  else if(/\{[a-zA-Z]/.test(prompt)&&!/(英语|日语|韩语|泰语|西班牙语|阿拉伯语|葡萄牙语|越南语|印尼语|马来语)[：:]/.test(prompt)){
+    deducts.push({dim:'⑤',tag:'warn',text:'非中文台词未标注语言 → 建议加「英语:」「日语:」等前缀'});
+  }
+  if(!genAudio&&score>0){
+    deducts.push({dim:'⑤',tag:'err',text:`generate_audio=false 但提示词有声音标注 → 冲突！`});
+    score=Math.max(0,score-5);
+  }
+  if(genAudio&&score===0)suggests.push('generate_audio=true 但无声音描述，建议添加 (背景音乐) <音效> {台词}');
+  return{score,max,deducts,suggests,name:'⑤ 声音标注'};
+}
+
+// ---- ⑥ 参数自洽 10分 ----
+function checkParamConsistency(prompt,params){
+  let score=0;const max=10;const deducts=[],suggests=[];
+
+  // generate_audio 一致性
+  const hasSound=/[(){}\[\]【】<>]|音乐|音效|台词|旋律|背景音|鼓点|节拍|说唱|RAP|歌声/.test(prompt);
+  if(params.genAudio&&hasSound)score+=4;
+  else if(params.genAudio&&!hasSound){suggests.push('generate_audio=true 但提示词无声音描述，生成可能无声音')}
+  else if(!params.genAudio&&hasSound){deducts.push({dim:'⑥',tag:'err',text:'generate_audio=false 但提示词含声音描述 → 冲突'});score+=1}
+  else score+=4;
+
+  // ratio 语义匹配
+  const ratioHints=[
+    {re:/竖屏|手机视角|9:16/,val:'9:16'},
+    {re:/横屏|宽屏|电影|16:9|宽银幕/,val:'16:9'},
+    {re:/方形|正方形|1:1/,val:'1:1'},
+    {re:/4:3/,val:'4:3'},
+    {re:/3:4/,val:'3:4'},
+    {re:/21:9|超宽/,val:'21:9'}
+  ];
+  let ratioMatch=false;
+  for(const h of ratioHints){if(h.re.test(prompt)&&params.ratio===h.val)ratioMatch=true}
+  if(params.ratio==='adaptive')score+=3;
+  else if(ratioMatch)score+=3;
+  else if(ratioHints.some(h=>h.re.test(prompt))){deducts.push({dim:'⑥',tag:'warn',text:`提示词暗示的宽高比与 ratio=${params.ratio} 不匹配`})}
+
+  // resolution 语义匹配
+  const resMatches=[{re:/高清|720p|HD/,val:'720p'},{re:/480p|标清|SD/,val:'480p'}];
+  let resMatch=false;
+  for(const r of resMatches){if(r.re.test(prompt)&&params.resolution===r.val)resMatch=true}
+  if(resMatch)score+=3;
+  else if(!resMatches.some(r=>r.re.test(prompt)))score+=3;
+
+  return{score,max,deducts,suggests,name:'⑥ 参数自洽'};
+}
+
+// ---- 致命错误检测 ----
+function checkFatalErrors(prompt,taskType,params,stats,deductions){
+  // 编辑任务 ratio 必须是 adaptive
+  if(taskType==='edit'&&params.ratio!=='adaptive'){
+    deductions.push({dim:'⚡',tag:'err',text:`编辑任务 ratio 必须为 adaptive，当前为 ${params.ratio} → 同步报错`});
+  }
+  // 编辑任务 duration 必须是 -1
+  if(taskType==='edit'&&params.duration!==-1){
+    deductions.push({dim:'⚡',tag:'err',text:`编辑任务 duration 必须为 -1，当前为 ${params.duration} → 同步报错`});
+  }
+  // 延长任务 ratio
+  if(taskType==='extend'&&params.ratio!=='adaptive'){
+    deductions.push({dim:'⚡',tag:'err',text:`延长任务 ratio 必须为 adaptive，当前为 ${params.ratio} → 同步报错`});
+  }
+  // 首帧 ratio
+  if(taskType==='first'&&params.ratio!=='adaptive'){
+    deductions.push({dim:'⚡',tag:'err',text:`首帧/首尾帧任务 ratio 必须为 adaptive，当前为 ${params.ratio} → 异步报错`});
+  }
+}
+
+// ---- 渲染 ----
+function renderReport(pct,taskType,dims,deductions,suggestions){
+  reportSection.style.display='block';
+  const labels={t2v:'文生视频',edit:'视频编辑',extend:'视频延长',first:'首帧/首尾帧',ref:'参考生视频'};
+  taskTypeLabel.textContent=`判定任务：${labels[taskType]}`;
+
+  let cls='score-fail',level='✗ 需修改';
+  if(pct>=85){cls='score-pass';level='✓ 通过'}
+  else if(pct>=70){cls='score-warn';level='⚠ 建议优化'}
+  scoreCircle.className=`score-circle ${cls}`;
+  scoreCircle.textContent=pct;
+
+  // 维度条
+  dimBars.innerHTML=dims.map(d=>{
+    const p=Math.round(d.score/d.max*100);
+    const barCls=p>=70?'bar-good':p>=40?'bar-warn':'bar-bad';
+    return`<div class="dim-item">
+      <div class="dim-head"><span class="dim-name">${d.name}</span><span class="dim-score">${d.score}/${d.max}</span></div>
+      <div class="bar-track"><div class="bar-fill ${barCls}" style="width:${p}%"></div></div>
+    </div>`;
+  }).join('');
+
+  // 扣分
+  if(deductions.length>0){
+    deductionBox.style.display='block';
+    deductionList.innerHTML=deductions.map(d=>{
+      const tagCls=d.tag==='err'?'tag-err':d.tag==='warn'?'tag-warn':'tag-info';
+      return`<div class="deduction-item"><span class="tag ${tagCls}">${d.tag==='err'?'🔴 错误':d.tag==='warn'?'⚠ 警告':'ℹ 提示'}</span>${d.text}</div>`;
+    }).join('');
+  }else{deductionBox.style.display='none'}
+
+  // 建议
+  if(suggestions.length>0){
+    suggestBox.style.display='block';
+    suggestList.innerHTML=suggestions.map(s=>`<div class="suggest-item">💡 ${s}</div>`).join('');
+  }else{suggestBox.style.display='none'}
+
+  reportSection.scrollIntoView({behavior:'smooth'});
+}
+
+// 初始化
+updateCounts();
+})();
+</script>
+</body>
+</html>

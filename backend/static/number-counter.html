@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <title>数字频率统计器</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f5f6f7;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h2 { text-align: center; font-size: 22px; color: #1a2a4a; margin-bottom: 16px; }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06);
+            border: 1px solid #eee;
+        }
+        textarea {
+            width: 100%;
+            height: 110px;
+            margin: 10px 0;
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+        }
+        .hint { font-size: 12px; color: #888; margin-bottom: 6px; }
+        .button-group { margin: 15px 0; display: flex; flex-wrap: wrap; gap: 8px; }
+        button {
+            padding: 9px 16px;
+            background: #1989fa;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        button:active { opacity: .8; }
+        button.secondary { background: #f5f6f7; color: #333; border: 1px solid #ddd; }
+        button.selected { background: #16a34a; color: #fff; border: 2px solid #0f8a3d; box-shadow: 0 0 0 2px rgba(22,163,74,.2); }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; background: #fff; }
+        th, td { border: 1px solid #e5e5e5; padding: 8px 10px; text-align: center; }
+        th { background-color: #f2f2f2; position: sticky; top: 0; font-size: 13px; color: #555; }
+        td { font-size: 14px; }
+        tr:nth-child(even) { background-color: #fafafa; }
+        .num-cell { text-align: left; max-height: 6em; overflow-y: auto; word-break: break-all; line-height: 1.5; }
+        .count-num { font-weight: 700; color: #e65100; }
+        .copy-row-btn { padding: 4px 12px; background: #2196F3; font-size: 12px; }
+        #copyResult {
+            color: #0f9f45;
+            margin-left: 10px;
+            display: none;
+            font-size: 13px;
+        }
+        .empty-tip { text-align: center; color: #999; padding: 24px 0; font-size: 13px; }
+        .chip-input-row { display: flex; gap: 8px; margin: 10px 0; }
+        .chip-input-row input { flex: 1; min-width: 0; font-size: 16px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .chip-input-row input.chip-num { flex: 2; }
+        .chip-log { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .chip-log-item { background: #f0f7ff; border: 1px solid #d6e9ff; border-radius: 8px; padding: 6px 12px; font-size: 13px; color: #1a2a4a; }
+        .chip-log-item .chip-raw { font-weight: 700; }
+        .chip-log-item .chip-val { color: #e65100; font-weight: 700; }
+        .chip-log-item .chip-time { color: #999; font-size: 11px; margin-left: 4px; }
+        .chip-total { font-weight: 700; color: #e65100; }
+        .chip-empty { text-align: center; color: #999; padding: 16px 0; font-size: 13px; }
+        .extract-meta { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .extract-vote { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .extract-vote .v-pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .extract-vote .v-top { background: #e7f7ec; color: #1a7f37; }
+        .extract-vote .v-hot { background: #fef3e2; color: #b45309; }
+        .extract-vote .v-cold { background: #eef0f3; color: #8a94a6; }
+        .extract-top { font-size: 14px; margin-bottom: 10px; line-height: 1.8; }
+        .extract-top b { color: #16a34a; }
+        .extract-chip { display: flex; gap: 8px; flex-wrap: wrap; }
+        .extract-chip .ec-card { border: 1px solid #d6e9ff; border-radius: 8px; padding: 8px 10px; background: #f0f7ff; min-width: 140px; }
+        .extract-chip .ec-amt { font-size: 12px; color: #1d4ed8; font-weight: 700; margin-bottom: 4px; }
+        .extract-chip .ec-nums { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; color: #1e3a5f; word-break: break-all; line-height: 1.6; }
+        .extract-chip .ec-copy { margin-top: 5px; padding: 3px 10px; font-size: 11px; background: #2196F3; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .extract-error { color: #e5484d; font-size: 13px; padding: 8px 0; }
+        @media (max-width: 600px) {
+            body { padding: 10px; max-width: 100%; }
+            h2 { font-size: 20px; }
+            .card { padding: 12px; }
+            .button-group { gap: 6px; }
+            .button-group button { min-height: 44px; flex: 1 1 auto; }
+            .copy-row-btn { min-height: 44px; white-space: nowrap; flex: 0 0 auto; }
+            table { table-layout: fixed; }
+            th:nth-child(1), td:nth-child(1) { width: 46%; }
+            th:nth-child(2), td:nth-child(2) { width: 12%; }
+            th:nth-child(3), td:nth-child(3) { width: 14%; }
+            th:nth-child(4), td:nth-child(4) { width: 28%; }
+            th, td { word-break: break-all; white-space: normal; }
+        }
+    </style>
+</head>
+<body>
+    <h2>数字频率统计器</h2>
+
+    <div class="card">
+        <div class="hint">输入数字，可用逗号、换行、句号、顿号或空格分隔</div>
+        <textarea id="inputNumbers" placeholder="例如：01,05,13,01,22,05,01"></textarea>
+
+        <div class="button-group">
+            <button onclick="addNumbers()">➕ 添加统计</button>
+            <button class="secondary" onclick="resetCounter()">🔄 重置统计</button>
+        </div>
+        <div class="button-group">
+            <button class="secondary" onclick="sortByCount()">🔻 按次数排序</button>
+            <button class="secondary" onclick="sortByNumber()">🔺 按次数升序</button>
+            <button class="secondary" onclick="copySortedNumbers()">📋 复制数字</button>
+            <button class="secondary" onclick="copyWithCount()">📋 复制(含次数)</button>
+        </div>
+    </div>
+
+    <div class="card" id="stats">
+        <h3 style="font-size:16px;color:#1a2a4a;margin:0 0 4px">统计结果 <span id="copyResult">✓ 已复制到剪贴板</span></h3>
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>数字</th>
+                    <th>个数</th>
+                    <th>出现次数</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <div id="emptyTip" class="empty-tip">暂无数据，请在上方输入数字后点击「添加统计」</div>
+    </div>
+
+    <div class="card" id="chipCard">
+        <h3 style="font-size:16px;color:#1a2a4a;margin:0 0 4px">🎯 筹码统计</h3>
+        <div class="hint">输入号码（句点分隔多个，如 03.05）+ 筹码数，点「添加」自动按号码拆分累加；「抽签最冷」「抽取最冷8号」从数字仓库抽取号码填入号码框</div>
+        <div class="chip-input-row">
+            <input type="text" id="chipNumbers" class="chip-num" placeholder="号码，如 03 或 03.05" inputmode="numeric">
+            <input type="number" id="chipCount" placeholder="筹码，如 10" inputmode="numeric" min="0">
+        </div>
+        <div class="button-group">
+            <button onclick="extractColdest(1)">🧊 抽签最冷</button>
+            <button onclick="extractColdest(8)">🧊 抽取最冷8号</button>
+        </div>
+        <div class="button-group">
+            <button onclick="addChip()">➕ 添加筹码</button>
+            <button class="secondary" onclick="resetChip()">🔄 重置筹码</button>
+            <button class="secondary" onclick="copyChip()">📋 复制筹码</button>
+        </div>
+        <div id="coldest8Result"></div>
+
+        <h4 style="font-size:14px;color:#1a2a4a;margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center">
+            <span>合并结果</span>
+            <button class="secondary" onclick="copyChip()" style="font-size:12px;padding:4px 10px;white-space:nowrap">📋 一键复制全部</button>
+        </h4>
+        <table id="chipTable">
+            <thead>
+                <tr>
+                    <th>号码</th>
+                    <th>筹码</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <div id="chipTotal" style="font-weight:700;color:#e65100;font-size:14px;margin:8px 0;text-align:right">汇总结果 0</div>
+        <div id="chipEmptyTip" class="chip-empty">暂无筹码，请在上方输入号码和筹码数后点击「添加筹码」</div>
+
+        <h4 style="font-size:14px;color:#1a2a4a;margin:16px 0 8px">添加记录</h4>
+        <div id="chipLog" class="chip-log"></div>
+    </div>
+
+    <div class="card" id="extractCard">
+        <h3 style="font-size:16px;color:#1a2a4a;margin:0 0 4px">🐲 多组肖汇总 & 号码筹码</h3>
+        <div class="hint">勾选要抽取的类型（可同时选中），点「执行抽取·下单」拉取号码筹码并累加到上方「🎯 筹码统计」</div>
+        <div class="button-group">
+            <button id="btnZodiac" onclick="toggleZodiac()">☐ 抽取肖汇</button>
+            <button id="btnSizu" class="secondary" onclick="toggleSizu()">☐ 抽取四组</button>
+            <button class="secondary" onclick="executeExtract()">✅ 执行抽取·下单</button>
+        </div>
+        <div id="extractResult"></div>
+    </div>
+
+    <script>
+        (function () {
+            const numberCounts = new Map();
+            let currentSort = 'count';
+            let groupedData = [];
+
+            // 归一化：按数值归并，个位数补零到两位（03 和 3 都算 03）
+            function normalizeNum(str) {
+                const n = parseInt(str, 10);
+                if (isNaN(n)) return null;
+                return n < 10 ? '0' + n : String(n);
+            }
+
+            function addNumbers() {
+                const input = document.getElementById('inputNumbers').value.trim();
+                if (!input) return;
+
+                const normalized = input.replace(/[\n,，、。\.\s]+/g, ',');
+                const numbers = normalized.split(',')
+                    .map(function (num) { return num.trim(); })
+                    .filter(function (num) { return num !== '' && !isNaN(num); })
+                    .map(normalizeNum)
+                    .filter(function (num) { return num !== null; });
+
+                if (numbers.length === 0) return;
+
+                numbers.forEach(function (num) {
+                    numberCounts.set(num, (numberCounts.get(num) || 0) + 1);
+                });
+
+                updateTable();
+                document.getElementById('inputNumbers').value = '';
+            }
+
+            function updateTable() {
+                const tbody = document.querySelector('#resultTable tbody');
+                tbody.innerHTML = '';
+
+                // 按出现次数分组
+                const countGroups = new Map();
+                numberCounts.forEach(function (count, num) {
+                    if (!countGroups.has(count)) countGroups.set(count, []);
+                    countGroups.get(count).push(num);
+                });
+                // 组内数字升序
+                countGroups.forEach(function (nums) { nums.sort(function (a, b) { return Number(a) - Number(b); }); });
+
+                // 分组排序：按次数降序 或 升序
+                let groupedEntries = Array.from(countGroups.entries());
+                if (currentSort === 'count') {
+                    groupedEntries.sort(function (a, b) { return b[0] - a[0]; });
+                } else {
+                    groupedEntries.sort(function (a, b) { return a[0] - b[0]; });
+                }
+
+                groupedData = groupedEntries;
+
+                groupedEntries.forEach(function (entry) {
+                    const count = entry[0];
+                    const nums = entry[1];
+                    const numbersStr = nums.join(', ');
+
+                    const row = document.createElement('tr');
+
+                    // 数字
+                    const numTd = document.createElement('td');
+                    const numDiv = document.createElement('div');
+                    numDiv.className = 'num-cell';
+                    numDiv.textContent = numbersStr;
+                    numTd.appendChild(numDiv);
+
+                    // 个数（新增：这一组有几个数字）
+                    const cntTd = document.createElement('td');
+                    cntTd.textContent = nums.length;
+                    cntTd.className = 'count-num';
+
+                    // 出现次数
+                    const countTd = document.createElement('td');
+                    countTd.textContent = count;
+                    countTd.className = 'count-num';
+
+                    // 操作
+                    const actionTd = document.createElement('td');
+                    const btn = document.createElement('button');
+                    btn.textContent = '复制';
+                    btn.className = 'copy-row-btn';
+                    btn.onclick = function () { copyToClipboard(numbersStr); };
+                    actionTd.appendChild(btn);
+
+                    row.appendChild(numTd);
+                    row.appendChild(cntTd);
+                    row.appendChild(countTd);
+                    row.appendChild(actionTd);
+                    tbody.appendChild(row);
+                });
+
+                // 空状态
+                document.getElementById('emptyTip').style.display =
+                    numberCounts.size === 0 ? 'block' : 'none';
+            }
+
+            function sortByCount() {
+                currentSort = 'count';
+                updateTable();
+            }
+
+            function sortByNumber() {
+                currentSort = 'number';
+                updateTable();
+            }
+
+            // 复制到剪贴板（三层兜底：Clipboard API → execCommand → prompt）
+            function copyToClipboard(text) {
+                let done = false;
+                // 方式1：Clipboard API
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        showCopied();
+                    }).catch(function () {
+                        fallbackCopy(text);
+                    });
+                    return;
+                }
+                fallbackCopy(text);
+            }
+
+            function fallbackCopy(text) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', 'readonly');
+                ta.style.position = 'absolute';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                ta.setSelectionRange(0, 99999);
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (e) {}
+                document.body.removeChild(ta);
+                if (ok) {
+                    showCopied();
+                } else {
+                    window.prompt('复制失败，请手动复制：', text);
+                }
+            }
+
+            function showCopied() {
+                const copyResult = document.getElementById('copyResult');
+                copyResult.style.display = 'inline';
+                setTimeout(function () { copyResult.style.display = 'none'; }, 2000);
+            }
+
+            function copySortedNumbers() {
+                if (groupedData.length === 0) return;
+                const text = groupedData.map(function (entry) {
+                    return entry[1].join(', ');
+                }).join('\n');
+                copyToClipboard(text);
+            }
+
+            function copyWithCount() {
+                if (groupedData.length === 0) return;
+                const text = groupedData.map(function (entry) {
+                    return '按' + entry[0] + '次: ' + entry[1].join(', ');
+                }).join('\n');
+                copyToClipboard(text);
+            }
+
+            function resetCounter() {
+                numberCounts.clear();
+                groupedData = [];
+                document.querySelector('#resultTable tbody').innerHTML = '';
+                document.getElementById('inputNumbers').value = '';
+                document.getElementById('emptyTip').style.display = 'block';
+            }
+
+            // ===== 筹码统计 =====
+            const chipCounts = new Map();   // 号码 -> 总筹码
+            const chipLogList = [];          // [{raw, val, time}]
+
+            // 拆分号码字符串：句点/逗号/顿号/空格/换行分隔，逐个数归一化补零
+            function parseChipNumbers(str) {
+                if (!str) return [];
+                const normalized = str.replace(/[\n,，、。\s]+/g, '.');
+                return normalized.split('.')
+                    .map(function (s) { return s.trim(); })
+                    .filter(function (s) { return s !== '' && !isNaN(s); })
+                    .map(normalizeNum)
+                    .filter(function (n) { return n !== null; });
+            }
+
+            function addChip() {
+                const numInput = document.getElementById('chipNumbers').value.trim();
+                const valInput = document.getElementById('chipCount').value.trim();
+                if (!numInput || !valInput) {
+                    alert('请输入号码和筹码数');
+                    return;
+                }
+                const chip = parseFloat(valInput);
+                if (isNaN(chip) || chip <= 0) {
+                    alert('筹码数需为正数');
+                    return;
+                }
+                const nums = parseChipNumbers(numInput);
+                if (nums.length === 0) {
+                    alert('未识别到有效号码');
+                    return;
+                }
+                // 累加（保留 2 位小数，避免浮点误差）
+                nums.forEach(function (n) {
+                    const old = chipCounts.get(n) || 0;
+                    chipCounts.set(n, Math.round((old + chip) * 100) / 100);
+                });
+                chipLogList.push({
+                    raw: numInput,
+                    val: chip,
+                    time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+                });
+                renderChip();
+                saveChip();
+                document.getElementById('chipNumbers').value = '';
+                document.getElementById('chipCount').value = '';
+            }
+
+            function renderChip() {
+                // 合并结果表
+                const tbody = document.querySelector('#chipTable tbody');
+                tbody.innerHTML = '';
+                // 按筹码金额分组：相同筹码的号码用句点合并（如 01.45）
+                const byVal = new Map();
+                chipCounts.forEach(function (val, num) {
+                    if (!byVal.has(val)) byVal.set(val, []);
+                    byVal.get(val).push(num);
+                });
+                byVal.forEach(function (nums) {
+                    nums.sort(function (a, b) { return Number(a) - Number(b); });
+                });
+                const entries = Array.from(byVal.entries())
+                    .sort(function (a, b) { return b[0] - a[0]; });
+                entries.forEach(function (entry) {
+                    const val = entry[0];
+                    const numsStr = entry[1].join('.');
+                    const row = document.createElement('tr');
+
+                    const numTd = document.createElement('td');
+                    numTd.textContent = numsStr;
+                    numTd.style.fontWeight = '700';
+
+                    const valTd = document.createElement('td');
+                    valTd.textContent = val;
+                    valTd.className = 'chip-total';
+
+                    const actTd = document.createElement('td');
+                    const btn = document.createElement('button');
+                    btn.textContent = '复制';
+                    btn.className = 'copy-row-btn';
+                    btn.onclick = function () { copyToClipboard(entry[1].length === 1 ? (numsStr + '=' + val) : (numsStr + '各' + val)); };
+                    actTd.appendChild(btn);
+
+                    row.appendChild(numTd);
+                    row.appendChild(valTd);
+                    row.appendChild(actTd);
+                    tbody.appendChild(row);
+                });
+                // 汇总结果（总筹码）
+                let chipTotal = 0;
+                chipCounts.forEach(function (val) { chipTotal += val; });
+                chipTotal = Math.round(chipTotal * 100) / 100;
+                const totalEl = document.getElementById('chipTotal');
+                if (totalEl) totalEl.textContent = '汇总结果 ' + chipTotal;
+                document.getElementById('chipEmptyTip').style.display =
+                    chipCounts.size === 0 ? 'block' : 'none';
+
+                // 添加记录卡片（倒序显示最新在前）
+                const logEl = document.getElementById('chipLog');
+                logEl.innerHTML = '';
+                if (chipLogList.length === 0) return;
+                chipLogList.slice().reverse().forEach(function (item) {
+                    const div = document.createElement('div');
+                    div.className = 'chip-log-item';
+                    div.innerHTML =
+                        '<span class="chip-raw">' + escapeHtml(item.raw) + '</span>' +
+                        ' → 筹码 <span class="chip-val">' + item.val + '</span>' +
+                        '<span class="chip-time">' + escapeHtml(item.time) + '</span>';
+                    logEl.appendChild(div);
+                });
+            }
+
+            function resetChip() {
+                chipCounts.clear();
+                chipLogList.length = 0;
+                document.querySelector('#chipTable tbody').innerHTML = '';
+                document.getElementById('chipLog').innerHTML = '';
+                document.getElementById('chipNumbers').value = '';
+                document.getElementById('chipCount').value = '';
+                document.getElementById('chipEmptyTip').style.display = 'block';
+                const totalEl2 = document.getElementById('chipTotal');
+                if (totalEl2) totalEl2.textContent = '汇总结果 0';
+                saveChip();
+            }
+
+            function copyChip() {
+                if (chipCounts.size === 0) return;
+                const byVal = new Map();
+                chipCounts.forEach(function (val, num) {
+                    if (!byVal.has(val)) byVal.set(val, []);
+                    byVal.get(val).push(num);
+                });
+                byVal.forEach(function (nums) {
+                    nums.sort(function (a, b) { return Number(a) - Number(b); });
+                });
+                const entries = Array.from(byVal.entries())
+                    .sort(function (a, b) { return b[0] - a[0]; });
+                // 单号用 = 号（36=30），多号用 各（02.14各20）
+                const lines = entries.map(function (e) {
+                    const numsStr = e[1].join('.');
+                    return e[1].length === 1 ? (numsStr + '=' + e[0]) : (numsStr + '各' + e[0]);
+                });
+                // 汇总结果 = 所有筹码之和
+                let total = 0;
+                chipCounts.forEach(function (val) { total += val; });
+                total = Math.round(total * 100) / 100;
+                lines.push('汇总结果 ' + total);
+                copyToClipboard(lines.join('\n'));
+            }
+
+            // ===== 抽取号码（从 number-warehouse 抽取最冷号，填入号码框）=====
+            const NW_HOUSE_API = 'https://www.ct256.cn/number-warehouse/api';
+
+            async function extractColdest(N) {
+                const chipInput = document.getElementById('chipNumbers');
+                const resultEl = document.getElementById('coldest8Result');
+                resultEl.innerHTML = '<div style="text-align:center;color:#888;padding:10px 0">⏳ 抽取号码中…</div>';
+                try {
+                    const r = await fetch(NW_HOUSE_API + '/front/coldest8?N=' + N + '&K=6');
+                    if (!r.ok) throw new Error('抽取失败：' + r.status);
+                    const d = await r.json();
+                    if (!d.ok || !d.nums || !d.nums.length) throw new Error('无号码数据');
+                    const nums = d.nums.map(normalizeNum).filter(function (n) { return n !== null; });
+                    const numsStr = nums.join('.');
+                    // 直接填入号码框
+                    chipInput.value = numsStr;
+                    const label = N === 1 ? '最冷1号' : '前' + N + '最冷号';
+                    const gapsStr = (d.gaps || []).join('/');
+                    let stateStr = '';
+                    if (d.state) {
+                        if (d.state.state === 'holding') {
+                            stateStr = '<div style="font-size:12px;color:#b45309;margin-top:4px">🔒 跟踪持有第 ' + d.state.held + ' 期（剩 ' + d.state.remaining + ' 期）</div>';
+                        } else if (d.state.state === 'waiting') {
+                            stateStr = '<div style="font-size:12px;color:#8a94a6;margin-top:4px">⏸ 止损后等待中</div>';
+                        }
+                    }
+                    resultEl.innerHTML =
+                        '<div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:6px">✅ 已抽取' + label + '，填入号码框</div>' +
+                        '<div style="font-size:13px;color:#1e3a5f;font-weight:700">🎯 号码：' + escapeHtml(numsStr) + '</div>' +
+                        '<div style="font-size:12px;color:#888;margin-top:4px">遗漏期数：' + escapeHtml(gapsStr) + ' · 最新记录 ' + escapeHtml(d.latest_date || '') + '</div>' +
+                        stateStr;
+                } catch (err) {
+                    resultEl.innerHTML = '<div class="extract-error">❌ ' + escapeHtml(err.message || String(err)) + '</div>';
+                }
+            }
+
+            function escapeHtml(s) {
+                return String(s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
+
+            // ===== 多组肖汇总 & 号码筹码（从 number-warning 抽取）=====
+            const NW_API = 'https://www.ct256.cn/number-warning/api';
+
+            // 选中态（可同时选中肖汇 / 四组）
+            let selZodiac = false;
+            let selSizu = false;
+
+            function toggleZodiac() {
+                selZodiac = !selZodiac;
+                updateToggleBtns();
+            }
+            function toggleSizu() {
+                selSizu = !selSizu;
+                updateToggleBtns();
+            }
+            function updateToggleBtns() {
+                const bz = document.getElementById('btnZodiac');
+                const bs = document.getElementById('btnSizu');
+                if (bz) {
+                    bz.textContent = (selZodiac ? '☑' : '☐') + ' 抽取肖汇';
+                    bz.classList.toggle('selected', selZodiac);
+                }
+                if (bs) {
+                    bs.textContent = (selSizu ? '☑' : '☐') + ' 抽取四组';
+                    bs.classList.toggle('selected', selSizu);
+                }
+            }
+
+            async function getToken() {
+                const verifyResp = await fetch(NW_API + '/front/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: '8283103' }),
+                });
+                if (!verifyResp.ok) throw new Error('访问密码验证失败');
+                const v = await verifyResp.json();
+                if (!v.ok || !v.token) throw new Error('访问密码验证失败');
+                return v.token;
+            }
+
+            // 把「号码组 + 每号金额」累加进筹码统计并记录下单
+            function orderChips(groups, sourceLabel) {
+                (groups || []).forEach(function (g) {
+                    const nums = (g.nums || []).map(normalizeNum).filter(function (n) { return n !== null; });
+                    const amt = Math.round((Number(g.amount) || 0) * 100) / 100;
+                    if (nums.length === 0 || amt <= 0) return;
+                    nums.forEach(function (n) {
+                        const old = chipCounts.get(n) || 0;
+                        chipCounts.set(n, Math.round((old + amt) * 100) / 100);
+                    });
+                    chipLogList.push({
+                        raw: '[' + sourceLabel + '] ' + nums.join('.'),
+                        val: amt,
+                        time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+                    });
+                });
+            }
+
+            function pad2(n) { return Number(n) < 10 ? '0' + n : String(n); }
+
+            function renderZodiacHtml(d) {
+                const votes = d.votes || {};
+                const voteEntries = Object.entries(votes).sort(function (a, b) { return b[1] - a[1]; });
+                const maxVote = voteEntries.length ? voteEntries[0][1] : 0;
+                const topSet = new Set([].concat(d.top1 || [], d.top2 || [], d.top3 || [], d.eq4 || []));
+
+                const votePills = voteEntries.map(function (e) {
+                    const z = e[0], n = e[1];
+                    let cls = 'v-cold';
+                    if (topSet.has(z)) cls = 'v-top';
+                    else if (n >= maxVote - 1 && n >= 3) cls = 'v-hot';
+                    return '<span class="v-pill ' + cls + '">' + escapeHtml(z) + ' ' + n + '票</span>';
+                }).join('');
+
+                const chipCards = (d.chip_groups || []).map(function (g) {
+                    const nums = (g.nums || []).map(pad2).join('.');
+                    return '<div class="ec-card">' +
+                        '<div class="ec-amt">' + g.amount + '元（' + (g.nums || []).length + '号）</div>' +
+                        '<div class="ec-nums">' + escapeHtml(nums) + '</div>' +
+                        '<button class="ec-copy" onclick="copyToClipboard(\'' + nums + '\')">📋 复制号码</button>' +
+                        '</div>';
+                }).join('');
+
+                const topLine =
+                    '<div class="extract-top">Top1：<b>' + escapeHtml((d.top1 || []).join('')) + '</b>' +
+                    (d.top2 && d.top2.length ? ' · Top2：<b>' + escapeHtml(d.top2.join('')) + '</b>' : '') +
+                    (d.top3 && d.top3.length ? ' · Top3：<b>' + escapeHtml(d.top3.join('')) + '</b>' : '') +
+                    (d.eq4 && d.eq4.length ? ' · 4票：<b>' + escapeHtml(d.eq4.join('')) + '</b>' : '') +
+                    '</div>';
+
+                return '<div class="extract-meta">📌 ' + escapeHtml(d.period || '') + ' ' + escapeHtml(d.date || '') + ' · 数据源：number-warning 多组肖汇</div>' +
+                    topLine +
+                    '<div class="extract-vote">' + votePills + '</div>' +
+                    '<div style="font-size:13px;font-weight:700;margin:10px 0 6px">📋 号码筹码汇总（下注金额）</div>' +
+                    '<div class="extract-chip">' + (chipCards || '<div class="chip-empty">暂无筹码数据</div>') + '</div>';
+            }
+
+            // ===== 执行抽取·下单（把选中类型的号码筹码累加进筹码统计）=====
+            async function executeExtract() {
+                if (!selZodiac && !selSizu) {
+                    alert('请先勾选要抽取的类型（肖汇 / 四组，可同时选中）');
+                    return;
+                }
+                const resultEl = document.getElementById('extractResult');
+                resultEl.innerHTML = '<div style="text-align:center;color:#888;padding:12px 0">⏳ 抽取并下单中…</div>';
+                try {
+                    const token = await getToken();
+                    const sections = [];
+                    if (selZodiac) {
+                        const r = await fetch(NW_API + '/front/zodiacChip?token=' + encodeURIComponent(token));
+                        if (!r.ok) throw new Error('肖汇抽取失败：' + r.status);
+                        const d = await r.json();
+                        orderChips(d.chip_groups || [], '肖汇');
+                        sections.push(renderZodiacHtml(d));
+                    }
+                    if (selSizu) {
+                        const r = await fetch(NW_API + '/front/sizuChip?token=' + encodeURIComponent(token));
+                        if (!r.ok) throw new Error('四组抽取失败：' + r.status);
+                        const d = await r.json();
+                        orderChips(d.chip_groups || [], '四组');
+                        sections.push(renderSizuHtml(d));
+                    }
+                    const divider = sections.length > 1
+                        ? '<hr style="border:none;border-top:1px dashed #d6e9ff;margin:16px 0">'
+                        : '';
+                    resultEl.innerHTML =
+                        '<div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:8px">✅ 已下单：号码筹码已累加到上方「🎯 筹码统计」</div>' +
+                        sections.join(divider);
+                    renderChip();
+                    saveChip();
+                } catch (err) {
+                    resultEl.innerHTML = '<div class="extract-error">❌ ' + escapeHtml(err.message || String(err)) + '</div>';
+                }
+            }
+
+            function renderSizuHtml(d) {
+                // 方案概览
+                const planCards = (d.plans || []).filter(function (p) { return p.N > 0; }).map(function (p) {
+                    return '<div class="ec-card">' +
+                        '<div class="ec-amt">' + escapeHtml(p.name) + '（买' + p.N + '号 · 投' + p.invest + '元）</div>' +
+                        '<div class="ec-nums">' + escapeHtml(p.picks_str || '空仓') + '</div>' +
+                        '</div>';
+                }).join('');
+                // 号码筹码汇总
+                const chipCards = (d.chip_groups || []).map(function (g) {
+                    const nums = (g.nums || []).map(pad2).join('.');
+                    return '<div class="ec-card">' +
+                        '<div class="ec-amt">' + g.amount + '元（' + (g.nums || []).length + '号）</div>' +
+                        '<div class="ec-nums">' + escapeHtml(nums) + '</div>' +
+                        '<button class="ec-copy" onclick="copyToClipboard(\'' + nums + '\')">📋 复制号码</button>' +
+                        '</div>';
+                }).join('');
+                // 止损提示
+                const stoppedHtml = (d.stopped && d.stopped.length)
+                    ? '<div class="extract-error" style="margin:8px 0">⛔ 已止损停手：' +
+                      d.stopped.map(function (s) { return escapeHtml(s.name) + '（连亏' + s.stop_streak + '期）'; }).join('、') +
+                      '</div>'
+                    : '';
+
+                return '<div class="extract-meta">📌 四组汇 · ' + escapeHtml(d.period || '') + ' ' + escapeHtml(d.date || '') + ' · 数据源：number-warning 四组汇</div>' +
+                    stoppedHtml +
+                    '<div style="font-size:13px;font-weight:700;margin:10px 0 6px">🎯 今日下单指南（ROI前5方案）</div>' +
+                    '<div class="extract-chip">' + (planCards || '<div class="chip-empty">暂无方案</div>') + '</div>' +
+                    '<div style="font-size:13px;font-weight:700;margin:14px 0 6px">📋 号码筹码汇总（下注金额）</div>' +
+                    '<div class="extract-chip">' + (chipCards || '<div class="chip-empty">暂无筹码数据</div>') + '</div>';
+            }
+
+            // localStorage 持久化
+            function saveChip() {
+                try {
+                    localStorage.setItem('chipCounts', JSON.stringify(Array.from(chipCounts.entries())));
+                    localStorage.setItem('chipLogList', JSON.stringify(chipLogList));
+                } catch (e) {}
+            }
+            function loadChip() {
+                try {
+                    const m = JSON.parse(localStorage.getItem('chipCounts') || '[]');
+                    m.forEach(function (e) { chipCounts.set(e[0], e[1]); });
+                    const l = JSON.parse(localStorage.getItem('chipLogList') || '[]');
+                    l.forEach(function (x) { chipLogList.push(x); });
+                } catch (e) {}
+            }
+            loadChip();
+            renderChip();
+
+            // 挂出到 window（供 inline onclick 调用）
+            window.addNumbers = addNumbers;
+            window.resetCounter = resetCounter;
+            window.sortByCount = sortByCount;
+            window.sortByNumber = sortByNumber;
+            window.copySortedNumbers = copySortedNumbers;
+            window.copyWithCount = copyWithCount;
+            window.addChip = addChip;
+            window.resetChip = resetChip;
+            window.copyChip = copyChip;
+            window.extractColdest = extractColdest;
+            window.toggleZodiac = toggleZodiac;
+            window.toggleSizu = toggleSizu;
+            window.executeExtract = executeExtract;
+            window.copyToClipboard = copyToClipboard;
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>图片压缩器</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.container{max-width:600px;margin:0 auto;padding:16px}
+h1{font-size:22px;text-align:center;margin:20px 0 8px;color:#1a1a2e}
+.subtitle{text-align:center;font-size:13px;color:#999;margin-bottom:20px}
+
+/* 上传区 */
+.dropzone{border:2px dashed #d0d5dd;border-radius:16px;padding:40px 20px;text-align:center;background:#fff;cursor:pointer;transition:all .25s;position:relative}
+.dropzone:hover,.dropzone.dragover{border-color:#1989fa;background:#f0f7ff}
+.dropzone-icon{font-size:48px;margin-bottom:12px}
+.dropzone-text{font-size:14px;color:#666}
+.dropzone-hint{font-size:12px;color:#aaa;margin-top:6px}
+.dropzone input{display:none}
+
+/* 设置卡片 */
+.card{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);border:1px solid #eee}
+.card-title{font-size:13px;color:#888;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.card-title .icon{font-size:16px}
+
+.param-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.param-item{flex:1;min-width:80px}
+.param-item label{display:block;font-size:12px;color:#999;margin-bottom:4px}
+.param-item input,.param-item select{width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;background:#fafafa;transition:border .2s}
+.param-item input:focus,.param-item select:focus{outline:none;border-color:#1989fa;background:#fff}
+.param-item input{font-size:16px} /* 防iOS缩放 */
+.param-split{color:#ccc;font-size:18px;align-self:flex-end;padding-bottom:6px}
+
+.mode-btns{display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0}
+.mode-btn{flex:1;padding:8px 6px;border:none;background:#fafafa;font-size:13px;color:#999;cursor:pointer;transition:all .2s;text-align:center}
+.mode-btn:first-child{border-right:1px solid #e0e0e0}
+.mode-btn.active{background:#1989fa;color:#fff;font-weight:600}
+
+/* 格式选择 */
+.fmt-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.fmt-option{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer}
+.fmt-option input[type=radio]{accent-color:#1989fa}
+.fmt-hint{font-size:11px;color:#1989fa;margin-left:4px}
+
+.target-size-row{display:flex;align-items:center;gap:8px}
+.target-size-row input{width:100px;text-align:center;padding:8px;border:1px solid #e0e0e0;border-radius:8px;font-size:16px;background:#fafafa}
+.target-size-row input:focus{outline:none;border-color:#1989fa;background:#fff}
+.target-size-row .unit{font-size:14px;color:#888}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 24px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:#1989fa;color:#fff;width:100%}
+.btn-primary:hover{background:#1676e0}
+.btn-primary:disabled{background:#b0cff7;cursor:not-allowed}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:7px}
+.btn-outline{background:#fff;color:#1989fa;border:1px solid #1989fa}
+.btn-outline:hover{background:#f0f7ff}
+.btn-ghost{background:#f5f6f7;color:#555}
+.btn-ghost:hover{background:#e8e8ea}
+
+/* 进度条 */
+.progress-wrap{background:#e8e8ea;border-radius:10px;height:8px;overflow:hidden;margin:10px 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,#1989fa,#36b37e);transition:width .3s;border-radius:10px}
+.progress-info{display:flex;justify-content:space-between;font-size:12px;color:#888}
+
+/* 结果表格 */
+.result-table{width:100%;border-collapse:collapse;font-size:12px}
+.result-table th{text-align:left;padding:8px 6px;color:#999;font-weight:500;border-bottom:1px solid #eee;font-size:11px}
+.result-table td{padding:8px 6px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+.result-table .name-cell{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.size-orig{color:#aaa;font-size:11px}
+.size-new{color:#1989fa;font-weight:600}
+.rate-good{color:#36b37e;font-weight:600}
+.rate-ok{color:#faad14}
+.rate-bad{color:#ff4d4f}
+.status-ok{color:#36b37e}
+.status-fail{color:#ff4d4f}
+
+.actions-bar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.empty-state{text-align:center;padding:40px 20px;color:#bbb}
+.empty-state .icon{font-size:56px;display:block;margin-bottom:12px}
+.empty-state p{font-size:13px}
+
+/* 预览弹窗 */
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.overlay-content{background:#fff;border-radius:16px;max-width:90vw;max-height:85vh;overflow:auto;padding:20px}
+.overlay-content img{max-width:100%;border-radius:8px}
+.overlay-close{float:right;background:none;border:none;font-size:24px;cursor:pointer;color:#999;padding:4px 8px}
+
+/* 文档弹窗 */
+.doc-box{width:95%;max-width:560px;padding:18px}
+.doc-head{margin-bottom:12px}
+.doc-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #f0f0f0}
+.doc-sec{margin-bottom:14px;border:1px solid #eee;border-radius:10px;overflow:hidden}
+.doc-sec-head{display:flex;justify-content:space-between;align-items:center;background:#f7f8fa;padding:8px 12px}
+.doc-sec-title{font-size:13px;font-weight:600;color:#1a1a2e}
+.doc-sec-copy{background:none;border:1px solid #1989fa;color:#1989fa;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;flex-shrink:0}
+.doc-sec-copy:hover{background:#f0f7ff}
+.doc-sec-body{padding:10px 12px;font-size:12px;line-height:1.7;color:#444;white-space:pre-wrap;word-break:break-all;background:#fff}
+.doc-sec-body .dim{color:#1989fa;font-weight:600}
+.doc-field{display:flex;gap:8px;margin-bottom:6px}
+.doc-field label{flex-shrink:0;color:#888;font-size:12px;padding-top:2px}
+.doc-field input{flex:1;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:13px;background:#fafafa}
+
+@media(max-width:420px){
+  .param-row{flex-direction:column;gap:8px}
+  .param-split{display:none}
+  .mode-btn{font-size:12px;padding:8px 4px}
+  .result-table{font-size:11px}
+  .result-table td{padding:6px 4px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🖼️ 图片压缩器</h1>
+  <p class="subtitle">像素调整 + ≤490KB 精准控制</p>
+  <div style="text-align:center;margin-bottom:16px">
+    <button class="btn btn-outline btn-sm" onclick="openDoc()">📄 表情绘图文档</button>
+    <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="openCreatorDoc()">🎨 表情创作师 Prompt</button>
+  </div>
+
+  <!-- 上传区 -->
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">📁</div>
+    <div class="dropzone-text">点击上传或拖拽图片到此处</div>
+    <div class="dropzone-hint">支持 JPG / PNG / WebP / HEIC，批量处理</div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+  </div>
+
+  <!-- 待处理列表 -->
+  <div id="queueSection" style="display:none;margin-top:14px">
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span>待处理（<span id="queueCount">0</span> 张）</div>
+      <div id="queueList" style="max-height:120px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- 参数设置 -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-title"><span class="icon">⚙️</span>压缩参数</div>
+
+    <div class="param-row">
+      <div class="param-item">
+        <label>目标宽度</label>
+        <input type="number" id="targetW" value="800" min="10" max="10000" step="10">
+      </div>
+      <span class="param-split">×</span>
+      <div class="param-item">
+        <label>目标高度</label>
+        <input type="number" id="targetH" value="800" min="10" max="10000" step="10">
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label style="font-size:12px;color:#999;display:block;margin-bottom:6px">快捷尺寸</label>
+      <div id="presetBtns" style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="240" data-h="240">表情240</button>
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="50" data-h="50">头像/图标50</button>
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="400" data-h="400">头像400</button>
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="750" data-h="400">横幅750</button>
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="750" data-h="560">赞赏引导图</button>
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="750" data-h="750">赞赏致谢图</button>
+        <button class="btn btn-sm btn-ghost preset-btn" data-w="800" data-h="800">方图800</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label style="font-size:12px;color:#999;display:block;margin-bottom:6px">缩放模式</label>
+      <div class="mode-btns" id="modeBtns">
+        <button class="mode-btn active" data-mode="inside">等比缩放（留白）</button>
+        <button class="mode-btn" data-mode="cover">强制裁剪（填满）</button>
+        <button class="mode-btn" data-mode="width">仅限宽度</button>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label style="font-size:12px;color:#999;display:block;margin-bottom:6px">目标文件大小</label>
+      <div class="target-size-row">
+        <input type="number" id="targetSize" value="490" min="1" max="10240" step="1">
+        <span class="unit">KB</span>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label style="font-size:12px;color:#999;display:block;margin-bottom:6px">输出格式</label>
+      <div class="fmt-row">
+        <label class="fmt-option">
+          <input type="radio" name="format" value="webp"> WebP <span class="fmt-hint">推荐·体积小</span>
+        </label>
+        <label class="fmt-option">
+          <input type="radio" name="format" value="jpeg"> JPEG
+        </label>
+        <label class="fmt-option">
+          <input type="radio" name="format" value="png" checked> PNG（无损）</label>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btnStart" style="margin-top:16px" disabled>
+      🚀 开始压缩
+    </button>
+    <div class="progress-wrap" id="progressWrap" style="display:none">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+    <div class="progress-info" id="progressInfo" style="display:none"></div>
+  </div>
+
+  <!-- 结果区 -->
+  <div id="resultSection" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">✅</span>压缩结果</div>
+      <div style="overflow-x:auto">
+        <table class="result-table">
+          <thead><tr>
+            <th>文件名</th><th>原大小</th><th>新大小</th><th>压缩率</th><th>状态</th>
+          </tr></thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </div>
+      <div class="actions-bar">
+        <button class="btn btn-primary" id="btnDownloadAll">📦 全部下载</button>
+        <button class="btn btn-ghost" id="btnClear">清空重来</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 表情绘图文档弹窗 -->
+<div class="overlay" id="docOverlay" onclick="if(event.target===this)closeDoc()">
+  <div class="overlay-content doc-box">
+    <button class="overlay-close" onclick="closeDoc()">✕</button>
+    <div class="doc-head">
+      <h3 id="docTitle" style="margin:0;font-size:17px;color:#1a1a2e">📄 微信表情专辑绘图 Prompt 文档</h3>
+      <p id="docSubtitle" style="margin:4px 0 0;font-size:12px;color:#999">填入表单字段后，按板块复制对应 Prompt 使用</p>
+    </div>
+    <div class="doc-toolbar">
+      <button id="docCopyAllBtn" class="btn btn-primary btn-sm" onclick="copyDocAll()">📋 复制全文</button>
+      <span id="docCopyTip" style="font-size:12px;color:#36b37e;opacity:0;transition:opacity .2s">已复制 ✓</span>
+    </div>
+    <div id="docContent"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const dropzone=$('dropzone'), fileInput=$('fileInput');
+const targetW=$('targetW'), targetH=$('targetH'), targetSize=$('targetSize');
+const btnStart=$('btnStart'), progressWrap=$('progressWrap'),progressBar=$('progressBar'),progressInfo=$('progressInfo');
+const resultSection=$('resultSection'),resultBody=$('resultBody');
+const queueSection=$('queueSection'),queueList=$('queueList'),queueCount=$('queueCount');
+
+let files=[], results=[], resizeMode='inside';
+
+// 拖拽
+dropzone.addEventListener('click',()=>fileInput.click());
+dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('dragover')});
+dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop',e=>{
+  e.preventDefault();dropzone.classList.remove('dragover');
+  addFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change',()=>addFiles([...fileInput.files]));
+
+// 模式切换
+$('modeBtns').addEventListener('click',e=>{
+  if(!e.target.classList.contains('mode-btn'))return;
+  [...$('modeBtns').children].forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  resizeMode=e.target.dataset.mode;
+  if(resizeMode==='width'){targetH.disabled=true;targetH.value='';}
+  else targetH.disabled=false;
+});
+
+// 快捷尺寸
+$('presetBtns').addEventListener('click',e=>{
+  const btn=e.target.closest('.preset-btn');
+  if(!btn)return;
+  const w=btn.dataset.w, h=btn.dataset.h;
+  // 若当前是「仅限宽度」模式，切回等比缩放，否则高度被禁用
+  if(resizeMode==='width'){
+    resizeMode='inside';
+    targetH.disabled=false;
+    [...$('modeBtns').children].forEach(b=>b.classList.remove('active'));
+    $('modeBtns').children[0].classList.add('active');
+  }
+  targetW.value=w;
+  targetH.value=h;
+});
+
+function addFiles(newFiles){
+  const valid=newFiles.filter(f=>f.type.startsWith('image/'));
+  files.push(...valid);
+  updateQueue();
+  btnStart.disabled=files.length===0;
+}
+
+function updateQueue(){
+  queueCount.textContent=files.length;
+  if(files.length===0){queueSection.style.display='none';return}
+  queueSection.style.display='block';
+  queueList.innerHTML=files.map((f,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px solid #f5f5f5">
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">📄 ${f.name}</span>
+    <span style="color:#aaa;font-size:11px;flex-shrink:0;margin-left:8px">${(f.size/1024).toFixed(1)} KB</span>
+    <button style="background:none;border:none;color:#ff4d4f;cursor:pointer;font-size:16px;padding:2px 4px" onclick="removeFile(${i})">×</button>
+  </div>`).join('');
+}
+
+window.removeFile=function(i){files.splice(i,1);updateQueue();btnStart.disabled=files.length===0}
+
+// 核心：Canvas 调整像素 + 二分法控制大小
+async function processFile(file){
+  const fmt=document.querySelector('input[name=format]:checked').value;
+  const mime=fmt==='webp'?'image/webp':fmt==='jpeg'?'image/jpeg':'image/png';
+  const ext=fmt==='jpeg'?'jpg':fmt;
+  const maxKB=parseInt(targetSize.value)||490;
+  const tw=parseInt(targetW.value)||800;
+  const th=resizeMode==='width'?null:parseInt(targetH.value)||800;
+
+  // 1. 解码图片
+  const img=await loadImage(file);
+  const dpr=1; // 统一1x，不做高分屏适配
+
+  // 2. 计算目标尺寸
+  let drawW,drawH;
+  if(resizeMode==='inside'){
+    const ratio=Math.min(tw/img.width, th/img.height);
+    drawW=Math.round(img.width*ratio);
+    drawH=Math.round(img.height*ratio);
+  }else if(resizeMode==='cover'){
+    const ratio=Math.max(tw/img.width, th/img.height);
+    drawW=Math.round(img.width*ratio);
+    drawH=Math.round(img.height*ratio);
+  }else{ // width
+    drawW=tw;
+    drawH=Math.round(img.height*(tw/img.width));
+  }
+
+  // 3. Canvas 绘制
+  const canvas=document.createElement('canvas');
+  if(resizeMode==='cover'){
+    canvas.width=tw;canvas.height=th;
+    const ctx=canvas.getContext('2d');
+    const sx=(drawW-tw)/2, sy=(drawH-th)/2;
+    ctx.drawImage(img,sx,sy,tw,th,0,0,tw,th);
+  }else{
+    canvas.width=drawW;canvas.height=drawH;
+    canvas.getContext('2d').drawImage(img,0,0,drawW,drawH);
+  }
+
+  // 4. 二分法压缩到目标大小
+  let lo=1,hi=100,blob=null,lastBlob=null;
+  const targetBytes=maxKB*1024;
+
+  for(let iter=0;iter<12;iter++){
+    const q=Math.round((lo+hi)/2);
+    blob=await canvasToBlob(canvas,mime,q/100);
+    if(!blob)break;
+    if(blob.size<=targetBytes){
+      lastBlob=blob;
+      lo=q; // 质量可以再高一点
+    }else{
+      hi=q;
+    }
+    if(hi-lo<=2)break;
+  }
+
+  // 图小优化：若二分后仍远小于目标（说明图片信息量少，最高质量也够），直接尝试质量100%
+  if(lastBlob && lastBlob.size < targetBytes * 0.9){
+    const b100=await canvasToBlob(canvas,mime,1.0);
+    if(b100 && b100.size<=targetBytes) lastBlob=b100;
+  }
+
+  // 降级：如果 WebP 二分后仍超标，转 JPEG 再试
+  if((!lastBlob||lastBlob.size>targetBytes)&&mime==='image/webp'){
+    for(let q=90;q>=10;q-=5){
+      blob=await canvasToBlob(canvas,'image/jpeg',q/100);
+      if(blob&&blob.size<=targetBytes){lastBlob=blob;break}
+    }
+  }
+
+  // 最终降级：用最低质量
+  if(!lastBlob){
+    lastBlob=await canvasToBlob(canvas,mime,0.1);
+  }
+
+  const outName=file.name.replace(/\.[^.]+$/,'')+'_compressed.'+ext;
+  return {
+    name:file.name, outName,
+    origSize:file.size, newSize:lastBlob.size,
+    blob:lastBlob,
+    ok:lastBlob.size<=targetBytes
+  };
+}
+
+function loadImage(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=reject;
+      img.src=e.target.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function canvasToBlob(canvas,mime,quality){
+  return new Promise(resolve=>canvas.toBlob(resolve,mime,quality));
+}
+
+// 开始压缩
+btnStart.addEventListener('click',async()=>{
+  if(files.length===0)return;
+  btnStart.disabled=true;
+  resultBody.innerHTML='';
+  resultSection.style.display='none';
+  progressWrap.style.display='block';
+  progressInfo.style.display='flex';
+  results=[];
+
+  const total=files.length;
+  for(let i=0;i<total;i++){
+    progressInfo.innerHTML=`<span>处理中 ${i+1}/${total}</span><span>${files[i].name}</span>`;
+    progressBar.style.width=((i/total)*100)+'%';
+    try{
+      const r=await processFile(files[i]);
+      results.push(r);
+      appendResultRow(r,i);
+    }catch(e){
+      results.push({name:files[i].name,outName:'',origSize:files[i].size,newSize:0,blob:null,ok:false,error:e.message});
+      appendResultRow(results[results.length-1],i);
+    }
+  }
+
+  progressBar.style.width='100%';
+  progressInfo.innerHTML=`<span>✅ 完成 ${results.filter(r=>r.ok).length}/${total} 达标</span><span></span>`;
+  resultSection.style.display='block';
+  btnStart.disabled=false;
+
+  // 滚动到结果
+  resultSection.scrollIntoView({behavior:'smooth'});
+});
+
+function appendResultRow(r,i){
+  const row=document.createElement('tr');
+  const rate=r.origSize>0?((1-r.newSize/r.origSize)*100):0;
+  const rateClass=rate>70?'rate-good':rate>30?'rate-ok':'rate-bad';
+  row.innerHTML=`
+    <td class="name-cell" title="${r.name}">${r.name}</td>
+    <td class="size-orig">${(r.origSize/1024).toFixed(1)} KB</td>
+    <td class="size-new">${r.newSize>0?(r.newSize/1024).toFixed(1)+' KB':'—'}</td>
+    <td class="${rateClass}">${r.newSize>0?'↓'+rate.toFixed(1)+'%':'—'}</td>
+    <td class="${r.ok?'status-ok':'status-fail'}">${r.ok?'✅ 达标':'⚠️ '+(r.error||'超限')}</td>
+  `;
+  resultBody.appendChild(row);
+}
+
+// 全部下载
+$('btnDownloadAll').addEventListener('click',()=>{
+  results.filter(r=>r.blob).forEach((r,i)=>{
+    const url=URL.createObjectURL(r.blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=r.outName;
+    setTimeout(()=>{a.click();URL.revokeObjectURL(url)},i*200);
+  });
+});
+
+// 清空
+$('btnClear').addEventListener('click',()=>{
+  files=[];results=[];
+  updateQueue();
+  resultBody.innerHTML='';
+  resultSection.style.display='none';
+  progressWrap.style.display='none';
+  progressInfo.style.display='none';
+  btnStart.disabled=true;
+  fileInput.value='';
+});
+
+// ═══════════ 表情绘图文档 ═══════════
+var BASE_PROMPT = '【通用基础绘图Prompt（每次生成全部素材必须带上，绑定参考图）】\n参考上传的参考图画风，2D卡通，平涂绘画，线条柔和，干净配色，无厚重阴影，图片内部不出现任何文字，画面主体居中，商用合规，高清';
+
+var DOC_SECTIONS = [
+  {title:'通用基础绘图 Prompt', body:BASE_PROMPT},
+  {title:'专辑横幅图 · 750×400 横向', body:BASE_PROMPT+'，横向画面构图，角色主体展示，画面预留足够留白，适配微信表情商店头部banner版式，画面简洁无多余杂物，750x400'},
+  {title:'表情封面图 · 240×240 正方形', body:BASE_PROMPT+'，正方形构图，角色占据画面主要区域，主体视觉突出，画面构图饱满，用于微信表情专辑列表封面，240x240'},
+  {title:'聊天面板图标 · 50×50 透明PNG', body:BASE_PROMPT+'，头像构图，放大角色主体，删减非必要细节，轮廓清晰锐利，透明背景PNG，缩小尺寸下依旧可以清晰辨认形象，50x50'},
+  {title:'赞赏引导图 · 750×560 竖向', body:BASE_PROMPT+'，竖版构图，角色互动姿态，画面上方预留大面积空白区域，留给平台叠加文字，画面干净舒适，750x560'},
+  {title:'赞赏致谢图 · 750×750 正方形', body:BASE_PROMPT+'，正方形构图，角色表达感谢的动作姿态，柔和底色，预留文字留白位置，整体氛围柔和，750x750'},
+  {title:'聊天表情素材模板 · 240×240 透明PNG', body:BASE_PROMPT+'，正方形画面，透明PNG背景，完整角色形象，表现指定动作情绪，角色居中摆放，微信静态聊天表情，240x240'},
+  {title:'交付约束', body:'聊天面板图标必须输出透明背景，禁止底色填充\n所有图片不内置任何汉字、标语，文字全部后台配置\n角色出镜占比、主题匹配度，由外部根据表情总数量自行把控，绘图只输出图像结果'}
+];
+
+var DOC_FIELDS = ['作品类型','角色名称','角色说明','表情风格选择','表情主题选择','表情介绍','赞赏引导语'];
+var currentDocMode = 'draw';
+
+function buildDocSections(){
+  var html = '';
+  // 表单字段区
+  html += '<div class="doc-sec">';
+  html += '<div class="doc-sec-head"><span class="doc-sec-title">📝 作品信息（先填，再复制下方各板块）</span><button class="doc-sec-copy" onclick="copyDocFields()">复制</button></div>';
+  html += '<div class="doc-sec-body">';
+  DOC_FIELDS.forEach(function(f, i){
+    html += '<div class="doc-field"><label>'+f+'：</label><input id="docfield_'+i+'" placeholder="'+f+'"></div>';
+  });
+  html += '</div></div>';
+  // 各 Prompt 板块
+  DOC_SECTIONS.forEach(function(s, i){
+    html += '<div class="doc-sec">';
+    html += '<div class="doc-sec-head"><span class="doc-sec-title">'+s.title+'</span><button class="doc-sec-copy" onclick="copyDocSection('+i+')">复制</button></div>';
+    html += '<div class="doc-sec-body">'+escapeHtml(s.body)+'</div>';
+    html += '</div>';
+  });
+  $('docContent').innerHTML = html;
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function getFieldsText(){
+  var parts = [];
+  DOC_FIELDS.forEach(function(f, i){
+    var v = ($('docfield_'+i) && $('docfield_'+i).value.trim()) || '';
+    parts.push(f+'：'+(v||'（待填）'));
+  });
+  return parts.join('\n');
+}
+
+function buildFullText(){
+  var out = getFieldsText() + '\n\n';
+  out += DOC_SECTIONS.map(function(s){ return s.title + '\n' + s.body; }).join('\n\n');
+  return out;
+}
+
+function doCopy(text){
+  function fallback(){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(showDocTip, fallback);
+  } else { fallback(); showDocTip(); }
+}
+
+function showDocTip(){
+  var tip = $('docCopyTip');
+  if(!tip) return;
+  tip.style.opacity = '1';
+  setTimeout(function(){ tip.style.opacity = '0'; }, 1200);
+}
+
+function copyDocSection(i){
+  doCopy(DOC_SECTIONS[i].title + '\n' + DOC_SECTIONS[i].body);
+}
+
+function copyDocFields(){
+  doCopy(getFieldsText());
+}
+
+function copyDocAll(){
+  if (currentDocMode === 'creator') { doCopy(CREATOR_FULL); return; }
+  doCopy(buildFullText());
+}
+
+function openDoc(){
+  $('docTitle').textContent = '📄 微信表情专辑绘图 Prompt 文档';
+  $('docSubtitle').textContent = '填入表单字段后，按板块复制对应 Prompt 使用';
+  currentDocMode = 'draw';
+  buildDocSections();
+  $('docOverlay').classList.add('show');
+}
+
+function closeDoc(){
+  $('docOverlay').classList.remove('show');
+}
+
+// ═══════════ 表情创作师 Prompt ═══════════
+var CREATOR_FULL = '你现在是商业表情包提示词专属创作师，目标产出微信表情开放平台可用、原创无版权风险、高传播热度表情包生成提示词。\n\n要求规则：\n1. 全部全新原创角色设定，禁止复刻网上已有的IP、卡通形象、热门表情包人物，不借鉴现有表情包构图、人设，避免版权冲突；角色形象独一无二，不撞款市面已上架表情。\n2. 风格定位：大众讨喜，男女老少都能接受，适配微信聊天场景，情绪覆盖：开心、偷笑、委屈、无语、加油、生气、害羞、摆烂、比心、吃瓜、犯困、震惊，都是日常高频聊天会用到的情绪。\n3. 输出格式：每一条分为【角色人设】+【单张表情AI绘图提示词】+【负面提示词】。\n4. 图像硬性参数：50×50px微信表情标准尺寸，扁平化卡通，干净纯色背景，线条柔和，色块简洁，无复杂纹理，构图居中，主体饱满，适合做聊天表情；8K，高清，边缘干净利落。\n5. 规避项：不要写实人像，不要知名动漫角色，不要网络现成梗图形象，不要使用别人原创的动物/人物IP，不使用商标元素，不出现文字（表情图片本身不带字，文字后期上架再配）。\n6. 批量输出8套不同人设的表情提示词，每套包含对应人设下6个不同情绪的单图提示词；人设区分开，可以小动物、奇幻小生灵、软萌小怪、国风小灵物等不同方向。\n7. 负面提示词固定带上：水印，签名，logo，现有IP角色，知名卡通人物，复杂背景，文字，畸形，杂乱线条，写实，照片，多人物，模糊，噪点，版权形象。';
+
+var CREATOR_NEGATIVE = '水印，签名，logo，现有IP角色，知名卡通人物，复杂背景，文字，畸形，杂乱线条，写实，照片，多人物，模糊，噪点，版权形象';
+
+function buildCreatorSections(){
+  var html = '';
+  html += '<div class="doc-sec">';
+  html += '<div class="doc-sec-head"><span class="doc-sec-title">🎨 创作师 Prompt（完整）</span><button class="doc-sec-copy" onclick="copyCreatorAll()">复制</button></div>';
+  html += '<div class="doc-sec-body">'+escapeHtml(CREATOR_FULL)+'</div>';
+  html += '</div>';
+  html += '<div class="doc-sec">';
+  html += '<div class="doc-sec-head"><span class="doc-sec-title">🚫 负面提示词（单独）</span><button class="doc-sec-copy" onclick="copyCreatorNegative()">复制</button></div>';
+  html += '<div class="doc-sec-body">'+escapeHtml(CREATOR_NEGATIVE)+'</div>';
+  html += '</div>';
+  $('docContent').innerHTML = html;
+}
+
+function openCreatorDoc(){
+  $('docTitle').textContent = '🎨 商业表情包提示词创作师';
+  $('docSubtitle').textContent = '复制完整 Prompt 发给 AI，批量产出原创表情包提示词';
+  currentDocMode = 'creator';
+  buildCreatorSections();
+  $('docOverlay').classList.add('show');
+}
+
+function copyCreatorAll(){
+  doCopy(CREATOR_FULL);
+}
+
+function copyCreatorNegative(){
+  doCopy(CREATOR_NEGATIVE);
+}
+
+// 暴露到全局（onclick 内联调用需要）
+window.openDoc = openDoc;
+window.closeDoc = closeDoc;
+window.copyDocSection = copyDocSection;
+window.copyDocFields = copyDocFields;
+window.copyDocAll = copyDocAll;
+window.openCreatorDoc = openCreatorDoc;
+window.copyCreatorAll = copyCreatorAll;
+window.copyCreatorNegative = copyCreatorNegative;
+})();
+</script>
+</body>
+</html>

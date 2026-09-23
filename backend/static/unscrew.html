@@ -6,7 +6,7 @@
 <title>萌糖消了个消 - ct256.cn</title>
 <style>
 
-:root { --w: min(96vw,440px); --h: min(96vw,440px); }
+:root { --w: min(96vw, 440px); --h: min(91vw, 418px); }
 
 * { margin: 0px; padding: 0px; box-sizing: border-box; }
 
@@ -26,9 +26,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 
 .top-bar { display: flex; justify-content: space-between; align-items: center; width: var(--w); padding: 4px 4px 6px; flex-shrink: 0; position: relative; z-index: 2; }
 
-.level-badge { font-size: 14px; font-weight: 700; color: rgb(199, 210, 254); background: rgba(99, 102, 241, 0.2); padding: 4px 14px; border-radius: 20px; letter-spacing: 0.5px; cursor:pointer; user-select:none; }
+.level-badge { font-size: 16px; font-weight: 700; color: rgb(199, 210, 254); background: rgba(99, 102, 241, 0.2); padding: 6px 16px; border-radius: 20px; letter-spacing: 0.5px; cursor:pointer; user-select:none; }
 
-.sound-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.1); color: rgb(165, 180, 252); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sound-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.1); color: rgb(165, 180, 252); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
 .sound-btn.muted { color: rgb(107, 114, 128); background: rgba(255, 255, 255, 0.05); }
 
@@ -315,20 +315,20 @@ body.combo-fire::after { content: ""; position: fixed; inset: 0; pointer-events:
 .tut-btn.primary{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e1b4b;}
 .tut-btn.ghost{background:rgba(255,255,255,.08);color:#94a3b8;}
 
-.props-bar { display: flex; justify-content: center; gap: 8px; width: var(--w); padding: 6px 0px; flex-shrink: 0; }
+.props-bar { display: flex; justify-content: center; gap: 12px; width: var(--w); padding: 8px 0px; flex-shrink: 0; }
 .props-bar > div { position: relative; }
 
-.prop-btn { position: relative; width: 50px; height: 50px; border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); color: rgb(148, 163, 184); font-size: 20px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+.prop-btn { position: relative; width: 56px; height: 56px; border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); color: rgb(148, 163, 184); font-size: 22px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
 
 .prop-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.1); }
 
 .prop-btn:disabled { opacity: 0.3; pointer-events: none; }
 
-.prop-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: rgb(251, 191, 36); color: rgb(12, 12, 29); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0px 4px; line-height: 1; }
+.prop-badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; border-radius: 10px; background: rgb(251, 191, 36); color: rgb(12, 12, 29); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0px 4px; line-height: 1; }
 
 .prop-badge.zero { background: rgba(255, 255, 255, 0.08); color: rgb(102, 102, 102); }
 
-.prop-label { font-size: 9px; color: rgb(100, 116, 139); text-align: center; margin-top: 2px; }
+.prop-label { font-size: 11px; color: rgb(148, 163, 184); text-align: center; margin-top: 3px; }
 
 .coins { font-size: 13px; font-weight: 700; color: rgb(251, 191, 36); display: flex; align-items: center; gap: 3px; text-shadow: rgba(251, 191, 36, 0.2) 0px 0px 8px; }
 
@@ -477,9 +477,9 @@ body.combo-fire::after { content: ""; position: fixed; inset: 0; pointer-events:
     <div class="level-badge" id="levelBadge" onclick="toggleLevelPicker()">第 1 关 ▼</div>
   </div>
   <div class="score">⭐ <span id="scoreVal">0</span> <span class="coins">🪙 <span id="coinVal">0</span></span><div id="scorePop" class="score-pop" style="display:none"></div></div>
-  <button class="sound-btn" id="checkinBarBtn" onclick="if(!authState.token)showLogin();else showCheckin()" title="每日签到" style="font-size:13px;width:28px;height:28px;background:rgba(251,191,36,.15);color:#fbbf24">📅</button>
-  <button class="sound-btn" id="soundBtn" onclick="toggleThemePanel()" title="音效设置" style="font-size:14px;background:rgba(251,191,36,.25);color:#fde68a;border:1px solid rgba(251,191,36,.35);box-shadow:0 0 12px rgba(251,191,36,.2)">🎶</button>
-  <button class="sound-btn" id="skinBtn" onclick="showSkinPicker()" title="皮肤" style="font-size:14px;background:rgba(168,85,247,.15);color:#c4b5fd">🎨</button>
+  <button class="sound-btn" id="checkinBarBtn" onclick="if(!authState.token)showLogin();else showCheckin()" title="每日签到" style="background:rgba(251,191,36,.15);color:#fbbf24">📅</button>
+  <button class="sound-btn" id="soundBtn" onclick="toggleThemePanel()" title="音效设置" style="background:rgba(251,191,36,.25);color:#fde68a;border:1px solid rgba(251,191,36,.35);box-shadow:0 0 12px rgba(251,191,36,.2)">🎶</button>
+  <button class="sound-btn" id="skinBtn" onclick="showSkinPicker()" title="皮肤" style="background:rgba(168,85,247,.15);color:#c4b5fd">🎨</button>
 </div>
 
 <div class="theme-picker" id="themePicker">
@@ -497,7 +497,7 @@ body.combo-fire::after { content: ""; position: fixed; inset: 0; pointer-events:
 </div>
 
 <div class="pause-bar">
-  <button class="sound-btn" id="themeBtn" onclick="toggleSound()" title="静音开关" style="font-size:14px;width:36px;height:36px">🔊</button>
+  <button class="sound-btn" id="themeBtn" onclick="toggleSound()" title="静音开关">🔊</button>
   <button class="pause-btn" id="modeBtn" onclick="toggleMode()" title="模式切换" style="font-size:13px;padding:2px 10px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(99,102,241,.15);color:#c7d2fe;cursor:pointer">😊 普通</button>
   <button class="pause-btn" id="pauseBtn" onclick="togglePause()" title="暂停">⏸</button>
 </div>
@@ -1216,8 +1216,21 @@ function winLevel(){sfxWin();var bonus=level*50;
   if(firstClear){coins+=10;props.undo++;cleared.push(level);localStorage.setItem('game_cleared',JSON.stringify(cleared));$('winSub').textContent='第 '+level+' 关完成 +'+bonus+'分 🪙+10 ↩️+1'}
   else{$('winSub').textContent='第 '+level+' 关完成 +'+bonus+'分（重复通关无奖励）'}
   gameMode=0;updateModeUI();saveMode();saveProps();$('scoreVal').textContent=score;$('coinVal').textContent=coins;$('winScore').textContent=score;$('overlayWin').classList.add('show');updatePropUI();submitScore(score);clearAutoSave()}
-function nextLevel(){$('overlayWin').classList.remove('show');$('boardCleared').classList.remove('show');level++;generateLevel();saveProps()}
-function restartLevel(){score=levelEntryScore;$('scoreVal').textContent=score;$('overlayWin').classList.remove('show');$('overlayLose').classList.remove('show');$('boardCleared').classList.remove('show');clearAutoSave();generateLevel()}
+let _levelLock=!1;
+function nextLevel(){if(_levelLock)return;_levelLock=!0;processing=!1;
+  $('overlayWin').classList.remove('show');$('boardCleared').classList.remove('show');
+  var bn=$('btnNext'),br=$('btnReplay');bn&&(bn.disabled=!0);br&&(br.disabled=!0);
+  level++;if(comboTimer){clearTimeout(comboTimer);comboTimer=null}combo=0;
+  generateLevel();saveProps();
+  updatePropUI();$('comboCount').textContent='×0';$('scoreVal').textContent=score;
+  setTimeout(function(){_levelLock=!1;bn&&(bn.disabled=!1);br&&(br.disabled=!1)},600)}
+function restartLevel(){if(_levelLock)return;_levelLock=!0;processing=!1;
+  score=levelEntryScore;$('scoreVal').textContent=score;
+  $('overlayWin').classList.remove('show');$('overlayLose').classList.remove('show');$('boardCleared').classList.remove('show');
+  clearAutoSave();if(comboTimer){clearTimeout(comboTimer);comboTimer=null}combo=0;
+  var br=$('btnRetry'),bc=$('btnContinue');br&&(br.disabled=!0);bc&&(bc.disabled=!0);
+  generateLevel();updatePropUI();$('comboCount').textContent='×0';
+  setTimeout(function(){_levelLock=!1;br&&(br.disabled=!1);bc&&(bc.disabled=!1)},600)}
 // ═══════ AI 模拟演示 ═══════
 var _simRunning=!1,_simTimer=null;
 function stopSimulate(){_simRunning=!1;if(_simTimer){clearTimeout(_simTimer);_simTimer=null}$('simBadge')&&$('simBadge').remove()}

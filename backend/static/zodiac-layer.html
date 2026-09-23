@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes">
+<title>生肖关系层</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6f7;color:#1a1a2e;display:flex;justify-content:center;padding:20px;min-height:100vh}
+.container{width:100%;max-width:600px}
+.header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h1{font-size:20px;margin-bottom:0}
+.btn-nav{padding:5px 12px;border:1px solid #dcdde0;border-radius:16px;background:#fff;color:#666;font-size:12px;cursor:pointer;text-decoration:none;transition:all .15s;white-space:nowrap}
+.btn-nav:active{background:#f0f0f0;color:#333}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #eee}
+.card-title{font-size:12px;color:#999;margin-bottom:8px;font-weight:600}
+/* Input groups */
+.groups{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.groups.col3{grid-template-columns:1fr 1fr 1fr}
+.groups.cols-1{grid-template-columns:1fr !important}
+.groups.cols-2{grid-template-columns:repeat(2,1fr) !important}
+.group-item{display:flex;align-items:center;gap:6px}
+.group-label{font-size:13px;font-weight:700;color:#666;min-width:28px}
+.group-item input{flex:1;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;transition:border-color .15s}
+.group-item input:focus{border-color:#1989fa}
+/* Stats bar */
+.stats-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.stat-chip{padding:3px 10px;border-radius:12px;font-size:12px;background:#f0f0f0;color:#888}
+.stat-chip.high{background:#fff3e0;color:#e65100;font-weight:600}
+/* Matrix table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:8px 4px;text-align:center;font-weight:600;color:#999;border-bottom:2px solid #e8e8e8;font-size:12px}
+th:first-child{text-align:left;padding-left:8px}
+td{padding:8px 4px;text-align:center;border-bottom:1px solid #f0f0f0;transition:background .15s}
+td:first-child{text-align:left;padding-left:8px;font-weight:600}
+.zodiac-name{display:flex;align-items:center;gap:6px}
+.zodiac-emoji{font-size:16px}
+.mark{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:6px;font-size:14px;font-weight:700;transition:all .15s}
+.mark.hit{background:#e8f5e9;color:#2e7d32}
+.mark.miss{background:transparent;color:#ddd}
+.freq-col{font-weight:700;font-size:14px}
+.freq-0{color:#ddd}
+.freq-1{color:#90a4ae}
+.freq-2{color:#ff9800}
+.freq-3{color:#e65100}
+.freq-4,.freq-5{color:#d32f2f}
+tr:hover td{background:#fafafa}
+/* Overlap groups */
+.overlap-section{margin-top:10px}
+.overlap-title{font-size:12px;color:#999;margin-bottom:6px;font-weight:600}
+.overlap-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:8px;margin-bottom:4px;font-size:13px}
+.overlap-row:hover{background:#f5f6f7}
+.overlap-badge{background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+.overlap-names{color:#1a1a2e;font-weight:600}
+/* Quick fill */
+.quick-fill{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.quick-btn{padding:4px 12px;border:1px solid #dcdde0;border-radius:14px;background:#fff;color:#888;font-size:11px;cursor:pointer;transition:all .15s}
+.quick-btn:active{background:#1989fa;color:#fff;border-color:#1989fa}
+.btn-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.btn{padding:6px 18px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-primary{background:#1989fa;color:#fff}
+.btn-primary:active{background:#1464c4}
+.btn-outline{background:#fff;color:#666;border:1px solid #dcdde0}
+.btn-outline:active{background:#f0f0f0}
+.sort-ctrl{display:flex;gap:4px;align-items:center;font-size:11px;color:#999;margin-top:6px}
+.sort-ctrl span{cursor:pointer;padding:3px 8px;border-radius:10px;border:1px solid transparent}
+.sort-ctrl span.active{background:#e3f2fd;color:#1565c0;border-color:#bbdefb;font-weight:600}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+/* ── 手机端适配 ── */
+@media (max-width:420px){
+  body{padding:12px}
+  h1{font-size:17px}
+  .card{padding:10px;border-radius:10px;margin-bottom:10px}
+  .groups{grid-template-columns:1fr;gap:6px}
+  .group-item input{font-size:14px;padding:9px 10px}
+  .group-label{font-size:14px;min-width:24px}
+  table{font-size:11px}
+  th{font-size:10px;padding:6px 2px}
+  td{padding:6px 2px}
+  .zodiac-emoji{font-size:14px}
+  .mark{width:18px;height:18px;line-height:18px;font-size:12px;border-radius:5px}
+  .freq-col{font-size:12px}
+  .overlap-row{font-size:12px;flex-wrap:wrap;gap:4px;padding:4px 6px}
+  .btn-nav{padding:4px 8px;font-size:11px}
+  .btn{font-size:12px;padding:6px 14px}
+  .stat-chip{font-size:11px;padding:2px 8px}
+  .quick-btn{font-size:10px;padding:3px 10px}
+/* Zodiac picker buttons */
+.zodiac-btns{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.zodiac-btn{padding:2px 6px;border:1px solid #ddd;border-radius:10px;background:#fff;color:#666;font-size:10px;cursor:pointer;transition:all .12s;user-select:none;white-space:nowrap}
+.zodiac-btn:active{transform:scale(.94)}
+.zodiac-btn.active{background:#1989fa;color:#fff;border-color:#1989fa}
+.zodiac-btn .emoji{font-size:11px;margin-right:1px}
+}
+/* ── 平板端适配 ── */
+@media (min-width:600px) and (max-width:1024px){
+  .container{max-width:900px}
+  body{padding:24px}
+  h1{font-size:22px}
+  .groups{grid-template-columns:1fr;gap:10px}
+  .card{padding:18px;border-radius:14px;margin-bottom:14px}
+  .group-item input{font-size:15px;padding:10px 12px}
+  .group-label{font-size:14px;min-width:32px}
+  table{font-size:14px}
+  th{font-size:12px;padding:8px 6px}
+  td{padding:8px 6px}
+  .zodiac-emoji{font-size:18px}
+  .mark{width:28px;height:28px;line-height:28px;font-size:16px;border-radius:7px}
+  .freq-col{font-size:15px}
+  .btn-nav{padding:6px 16px;font-size:13px}
+  .btn{padding:8px 22px;font-size:14px}
+  .stat-chip{font-size:13px;padding:4px 12px}
+  .quick-btn{font-size:12px;padding:5px 14px}
+  .zodiac-btn{padding:4px 10px;font-size:13px;border-radius:12px}
+  .zodiac-btn .emoji{font-size:14px}
+  .overlap-row{font-size:14px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header-row">
+<h1>🔗 生肖关系层</h1>
+<a class="btn-nav" href="https://www.ct256.cn/numtool/">← 数字工具</a>
+</div>
+
+<div class="card">
+<div class="card-title">📥 输入 5 组生肖（每组用汉字输入，如 鼠牛蛇狗鸡猪）<button class="quick-btn" id="toggleLayout" style="float:right" onclick="toggleLayout()">📐 一排一</button></div>
+<div class="quick-fill">
+<button class="quick-btn" onclick="fillExample()">📋 示例数据</button>
+<button class="quick-btn" onclick="clearAll()">🗑 清空</button>
+</div>
+<div class="groups" id="inputGroups">
+<div class="group-wrapper" id="gw1"><div class="group-item"><span class="group-label">组1</span><input placeholder="鼠牛蛇狗鸡猪" oninput="syncZodiacBtns(0);update()"></div></div>
+<div class="group-wrapper" id="gw2"><div class="group-item"><span class="group-label">组2</span><input placeholder="兔羊牛马蛇猴狗" oninput="syncZodiacBtns(1);update()"></div></div>
+<div class="group-wrapper" id="gw3"><div class="group-item"><span class="group-label">组3</span><input placeholder="鸡狗虎龙蛇猪" oninput="syncZodiacBtns(2);update()"></div></div>
+<div class="group-wrapper" id="gw4"><div class="group-item"><span class="group-label">组4</span><input placeholder="鼠猴龙羊猪马" oninput="syncZodiacBtns(3);update()"></div></div>
+<div class="group-wrapper" id="gw5"><div class="group-item"><span class="group-label">组5</span><input placeholder="羊狗猪鸡鼠牛马" oninput="syncZodiacBtns(4);update()"></div></div>
+</div>
+<div class="btn-row">
+<button class="btn btn-primary" onclick="update()">🔍 分析</button>
+<button class="btn btn-outline" onclick="shareUrl()">📋 复制分享链接</button>
+</div>
+</div>
+
+<div class="card" id="resultCard" style="display:none">
+<div class="card-title">📊 矩阵分析</div>
+<div class="stats-bar" id="statsBar"></div>
+<div class="sort-ctrl">
+排序：<span class="active" onclick="setSort('default')">生肖序</span><span onclick="setSort('freq')">高频优先</span>
+</div>
+<div style="overflow-x:auto">
+<table id="matrix"></table>
+</div>
+<div class="overlap-section" id="overlapSection"></div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ZODIAC = ['鼠','牛','虎','兔','龙','蛇','马','羊','猴','鸡','狗','猪'];
+const ZODIAC_EMOJI = {鼠:'🐭',牛:'🐮',虎:'🐯',兔:'🐰',龙:'🐲',蛇:'🐍',马:'🐴',羊:'🐑',猴:'🐵',鸡:'🐔',狗:'🐶',猪:'🐷'};
+let sortMode = 'default';
+
+// ── 生肖按钮 ──
+function initZodiacBtns(){
+  for(let i=0;i<5;i++){
+    const gw = document.getElementById('gw'+(i+1));
+    if(!gw) continue;
+    const bar = document.createElement('div');
+    bar.className = 'zodiac-btns';
+    ZODIAC.forEach(z => {
+      const btn = document.createElement('span');
+      btn.className = 'zodiac-btn';
+      btn.innerHTML = ZODIAC_EMOJI[z]+z;
+      btn.onclick = () => toggleZodiac(i, z);
+      bar.appendChild(btn);
+    });
+    gw.appendChild(bar);
+  }
+}
+function getInput(idx){ return document.querySelectorAll('#inputGroups input')[idx]; }
+function syncZodiacBtns(idx){
+  const inp = getInput(idx);
+  if(!inp) return;
+  const selected = new Set(parseGroup(inp.value));
+  const gw = document.getElementById('gw'+(idx+1));
+  if(!gw) return;
+  const btns = gw.querySelectorAll('.zodiac-btn');
+  ZODIAC.forEach((z,j) => {
+    if(btns[j]) btns[j].classList.toggle('active', selected.has(z));
+  });
+}
+function syncAllBtns(){ for(let i=0;i<5;i++) syncZodiacBtns(i); }
+function toggleZodiac(idx, animal){
+  const inp = getInput(idx);
+  if(!inp) return;
+  const arr = parseGroup(inp.value);
+  if(arr.includes(animal)){
+    inp.value = arr.filter(z=>z!==animal).join('');
+  }else{
+    arr.push(animal);
+    inp.value = arr.join('');
+  }
+  syncZodiacBtns(idx);
+  update();
+}
+
+function parseGroup(text){
+  const set = new Set();
+  for(const ch of text){
+    if(ZODIAC.includes(ch)) set.add(ch);
+  }
+  return [...set];
+}
+
+function fillExample(){
+  const inputs = document.querySelectorAll('#inputGroups input');
+  const ex = ['鼠牛蛇狗鸡猪','兔羊牛马蛇猴狗','鸡狗虎龙蛇猪','鼠猴龙羊猪马','羊狗猪鸡鼠牛马'];
+  ex.forEach((v,i)=>{if(inputs[i])inputs[i].value=v});
+  update();
+}
+
+function clearAll(){
+  document.querySelectorAll('#inputGroups input').forEach(el=>el.value='');
+  syncAllBtns();
+  update();
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1500);
+}
+
+function shareUrl(){
+  const groups=[];
+  document.querySelectorAll('#inputGroups input').forEach(el=>groups.push(el.value));
+  const params=new URLSearchParams();
+  groups.forEach((g,i)=>{if(g)params.set('g'+(i+1),g)});
+  const url=location.origin+location.pathname+'?'+params.toString();
+  navigator.clipboard.writeText(url).then(()=>showToast('链接已复制 ✓')).catch(()=>showToast('复制失败'));
+}
+
+function setSort(mode){
+  sortMode=mode;
+  document.querySelectorAll('.sort-ctrl span').forEach(s=>s.classList.toggle('active',s.textContent===(mode==='default'?'生肖序':'高频优先')));
+  renderMatrix();
+}
+
+function update(){
+  renderMatrix();
+  // Auto-focus next input after filling
+}
+
+function getGroups(){
+  const inputs=document.querySelectorAll('#inputGroups input');
+  return Array.from(inputs).map(el=>parseGroup(el.value));
+}
+
+function renderMatrix(){
+  const groups=getGroups();
+  const hasData=groups.some(g=>g.length>0);
+  document.getElementById('resultCard').style.display=hasData?'block':'none';
+  if(!hasData)return;
+
+  // Frequency: how many groups each zodiac appears in
+  const freq={};
+  ZODIAC.forEach(z=>freq[z]=0);
+  groups.forEach(g=>g.forEach(z=>freq[z]++));
+
+  // Stats
+  const totalAnimals=new Set();
+  groups.forEach(g=>g.forEach(z=>totalAnimals.add(z)));
+  let maxFreq=0,maxFreqAnimals=[];
+  ZODIAC.forEach(z=>{
+    if(freq[z]>maxFreq){maxFreq=freq[z];maxFreqAnimals=[z]}
+    else if(freq[z]===maxFreq&&freq[z]>0)maxFreqAnimals.push(z);
+  });
+
+  const statsBar=document.getElementById('statsBar');
+  statsBar.innerHTML=
+    `<span class="stat-chip">${totalAnimals.size} 种动物</span>`+
+    `<span class="stat-chip high">最高频 ${maxFreq} 组: ${maxFreqAnimals.map(z=>z+ZODIAC_EMOJI[z]).join(' ')}</span>`+
+    `<span class="stat-chip">缺失: ${ZODIAC.filter(z=>freq[z]===0).map(z=>z+ZODIAC_EMOJI[z]).join(' ')||'无'}</span>`;
+
+  // Sort order
+  let order=[...ZODIAC];
+  if(sortMode==='freq'){
+    order.sort((a,b)=>freq[b]-freq[a]||ZODIAC.indexOf(a)-ZODIAC.indexOf(b));
+  }
+
+  // Matrix table
+  const freqClass=n=>{
+    if(n===0)return'freq-0';if(n===1)return'freq-1';if(n===2)return'freq-2';
+    if(n===3)return'freq-3';return'freq-4';
+  };
+
+  let html='<tr><th>生肖</th>';
+  for(let i=0;i<5;i++)html+=`<th>组${i+1}<br><span style="font-weight:400;font-size:10px;color:#aaa">${groups[i].length}个</span></th>`;
+  html+='<th>频次</th></tr>';
+
+  order.forEach(z=>{
+    html+=`<tr><td><div class="zodiac-name"><span class="zodiac-emoji">${ZODIAC_EMOJI[z]}</span>${z}</div></td>`;
+    for(let i=0;i<5;i++){
+      const hit=groups[i].includes(z);
+      html+=`<td><span class="mark ${hit?'hit':'miss'}">${hit?'✓':''}</span></td>`;
+    }
+    html+=`<td class="freq-col ${freqClass(freq[z])}">${freq[z]||''}</td></tr>`;
+  });
+  document.getElementById('matrix').innerHTML=html;
+
+  // Overlap analysis — which groups share which zodiacs
+  let overlapHtml='<div class="overlap-title">🔗 组间重叠分析</div>';
+  const cross=[]; // {groups, animals}
+  for(let i=0;i<5;i++){
+    for(let j=i+1;j<5;j++){
+      const shared=[];
+      ZODIAC.forEach(z=>{if(groups[i].includes(z)&&groups[j].includes(z))shared.push(z)});
+      if(shared.length>0)cross.push({groups:[i+1,j+1],animals:shared});
+    }
+  }
+  // 3-way overlaps
+  for(let i=0;i<5;i++){
+    for(let j=i+1;j<5;j++){
+      for(let k=j+1;k<5;k++){
+        const shared=[];
+        ZODIAC.forEach(z=>{if(groups[i].includes(z)&&groups[j].includes(z)&&groups[k].includes(z))shared.push(z)});
+        if(shared.length>0)cross.push({groups:[i+1,j+1,k+1],animals:shared});
+      }
+    }
+  }
+  // 4-way
+  for(let i=0;i<5;i++){
+    for(let j=i+1;j<5;j++){
+      for(let k=j+1;k<5;k++){
+        for(let l=k+1;l<5;l++){
+          const shared=[];
+          ZODIAC.forEach(z=>{if(groups[i].includes(z)&&groups[j].includes(z)&&groups[k].includes(z)&&groups[l].includes(z))shared.push(z)});
+          if(shared.length>0)cross.push({groups:[i+1,j+1,k+1,l+1],animals:shared});
+        }
+      }
+    }
+  }
+  // Sort by shared count desc
+  cross.sort((a,b)=>b.animals.length-a.animals.length||a.groups.length-b.groups.length);
+
+  if(cross.length===0){
+    overlapHtml+='<div style="color:#ccc;font-size:13px;padding:8px;">无组间重叠</div>';
+  }else{
+    cross.forEach(({groups:g,n,animals:a})=>{
+      overlapHtml+=`<div class="overlap-row"><span class="overlap-badge">组${g.sort((x,y)=>x-y).join('+')}</span><span class="overlap-names">${a.map(z=>z+ZODIAC_EMOJI[z]).join(' ')}</span></div>`;
+    });
+  }
+  document.getElementById('overlapSection').innerHTML=overlapHtml;
+}
+
+// ── 布局切换 ──
+function toggleLayout(){
+  const groups = document.getElementById('inputGroups');
+  const btn = document.getElementById('toggleLayout');
+  const isOne = groups.classList.contains('cols-1');
+  if(isOne){
+    groups.classList.remove('cols-1');
+    groups.classList.add('cols-2');
+    btn.textContent = '📐 一排一';
+  }else{
+    groups.classList.remove('cols-2');
+    groups.classList.add('cols-1');
+    btn.textContent = '📐 双排';
+  }
+  localStorage.setItem('zodiac-cols', isOne ? '2' : '1');
+}
+
+// Load from URL params on init
+(function(){
+  initZodiacBtns();
+  // 恢复布局偏好
+  const saved = localStorage.getItem('zodiac-cols');
+  const groups = document.getElementById('inputGroups');
+  const btn = document.getElementById('toggleLayout');
+  if(saved === '1'){
+    groups.classList.add('cols-1');
+    btn.textContent = '📐 双排';
+  }else if(saved === '2'){
+    groups.classList.add('cols-2');
+    btn.textContent = '📐 一排一';
+  }
+  const params=new URLSearchParams(location.search);
+  const inputs=document.querySelectorAll('#inputGroups input');
+  let hasParam=false;
+  for(let i=0;i<5;i++){
+    const v=params.get('g'+(i+1));
+    if(v&&inputs[i]){inputs[i].value=v;hasParam=true}
+  }
+  if(hasParam){ syncAllBtns(); update(); }
+})();
+</script>
+</body>
+</html>

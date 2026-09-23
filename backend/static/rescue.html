@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🛟 救援面板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#f5f6f7;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:16px;padding:24px;width:90%;max-width:420px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+h1{font-size:20px;text-align:center;margin-bottom:4px}
+.sub{text-align:center;color:#999;font-size:12px;margin-bottom:16px}
+.status-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-green{background:#22c55e}.dot-red{background:#ee0a24}.dot-gray{background:#ccc}
+.section{margin-top:16px}
+.section-title{font-size:13px;color:#999;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.btns{display:grid;gap:8px}
+.btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;text-align:left;display:flex;align-items:center;gap:8px}
+.btn:active{opacity:.7;transform:scale(.98)}
+.btn-active{box-shadow:inset 0 0 0 2px #1989fa;background:#ecf5ff!important;color:#1989fa!important}
+.btn-ds{background:#e8f4fd;color:#1a6fb5}
+.btn-kimi{background:#f3e8ff;color:#7c3aed}
+.btn-danger{background:#ee0a24;color:#fff}
+.btn-ghost{background:#f5f6f7;color:#666}
+.btn-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0}
+.btn-label{flex:1;line-height:1.3}
+.btn-hint{font-size:11px;color:#999;font-weight:400}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;z-index:999;display:none}
+.loading{opacity:.6;pointer-events:none}
+.mode-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.badge-ds{background:#e8f4fd;color:#1a6fb5}
+.badge-kimi{background:#f3e8ff;color:#7c3aed}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🛟 救援面板</h1>
+  <p class="sub">Hermes 挂了？点一下就好</p>
+
+  <div class="status-row">
+    <span>🤖 Hermes</span>
+    <span id="hermesStatus"><span class="status-dot dot-gray"></span>检测中</span>
+  </div>
+  <div class="status-row">
+    <span>🔀 代理</span>
+    <span id="proxyStatus"><span class="status-dot dot-gray"></span>检测中</span>
+  </div>
+  <div class="status-row">
+    <span>🔑 Kimi</span>
+    <span id="kimiStatus"><span class="status-dot dot-gray"></span>检测中</span>
+  </div>
+  <div class="status-row">
+    <span>🎯 当前</span>
+    <span id="currentMode" style="font-weight:600"></span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🤖 DeepSeek</div>
+    <div class="btns">
+      <button class="btn btn-ds" id="btn-ds-direct" onclick="rescue('switch',{mode:'ds-direct'})">
+        <span class="btn-icon">⚡</span>
+        <span class="btn-label">DeepSeek V4 Pro<span class="btn-hint">直连，最稳</span></span>
+      </button>
+      <button class="btn btn-ds" id="btn-ds-proxy" onclick="rescue('switch',{mode:'ds-proxy'})">
+        <span class="btn-icon">🔀</span>
+        <span class="btn-label">DeepSeek V4 Pro<span class="btn-hint">走代理，可追踪</span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🧠 Kimi / Moonshot</div>
+    <div class="btns">
+      <button class="btn btn-kimi" id="btn-kimi-k3" onclick="rescue('switch',{mode:'kimi-k3'})">
+        <span class="btn-icon">🔥</span>
+        <span class="btn-label">Kimi K3<span class="btn-hint">1M上下文+视觉+推理</span></span>
+      </button>
+      <button class="btn btn-kimi" id="btn-kimi-k25" onclick="rescue('switch',{mode:'kimi-k25'})">
+        <span class="btn-icon">🧠</span>
+        <span class="btn-label">Kimi K2.5<span class="btn-hint">256K推理</span></span>
+      </button>
+      <button class="btn btn-kimi" id="btn-kimi-fast" onclick="rescue('switch',{mode:'kimi-fast'})">
+        <span class="btn-icon">⚡</span>
+        <span class="btn-label">Kimi 8K<span class="btn-hint">秒回，最便宜</span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔄 运维</div>
+    <div class="btns">
+      <button class="btn btn-danger" onclick="rescue('restart',{target:'proxy'})">
+        <span class="btn-icon">🔄</span>
+        <span class="btn-label">重启代理 (8100)</span>
+      </button>
+      <button class="btn btn-ghost" onclick="rescue('restart',{target:'tunnel'})">
+        <span class="btn-icon">🌐</span>
+        <span class="btn-label">重启 Tunnel</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/neunav/api/rescue';
+let loading = false;
+
+async function refreshStatus(){
+  try{
+    const r = await fetch(API+'/status');
+    const d = await r.json();
+    updateDot('hermesStatus', d.hermes_running);
+    updateDot('proxyStatus', d.proxy_alive);
+    updateDot('kimiStatus', d.kimi_configured);
+    
+    // 当前模式
+    const modeEl = document.getElementById('currentMode');
+    const isDS = d.current_url && d.current_url.includes('deepseek');
+    const isKimi = d.current_url && d.current_url.includes('moonshot');
+    const isProxy = d.current_url && d.current_url.includes('localhost');
+    
+    let badge = '';
+    if(isKimi) badge = '<span class="mode-badge badge-kimi">Kimi</span> ';
+    else if(isDS && !isProxy) badge = '<span class="mode-badge badge-ds">DS直连</span> ';
+    else if(isDS && isProxy) badge = '<span class="mode-badge badge-ds">DS代理</span> ';
+    
+    modeEl.innerHTML = badge + (d.current_model || '?');
+    
+    // 高亮当前按钮
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('btn-active'));
+    const map = {
+      'ds-direct': isDS && !isProxy,
+      'ds-proxy': isDS && isProxy,
+      'kimi-k3': isKimi && d.current_model === 'kimi-k3',
+      'kimi-k25': isKimi && d.current_model === 'kimi-k2.5',
+      'kimi-fast': isKimi && d.current_model === 'moonshot-v1-8k',
+    };
+    for(const [k,v] of Object.entries(map)) {
+      if(v) document.getElementById('btn-'+k)?.classList.add('btn-active');
+    }
+  }catch(e){
+    document.getElementById('currentMode').textContent = '获取失败';
+  }
+}
+
+function updateDot(id, alive){
+  const el = document.getElementById(id);
+  const textMap = {
+    hermesStatus: alive?'运行中':'已停止',
+    proxyStatus: alive?'正常':'挂了',
+    kimiStatus: alive?'已配':'未配'
+  };
+  const dotColor = alive?'dot-green':'dot-red';
+  el.innerHTML = `<span class="status-dot ${dotColor}"></span>${textMap[id]||'?'}`;
+}
+
+function toast(msg, ok=true){
+  const t = document.getElementById('toast');
+  t.style.background = ok?'#333':'#ee0a24';
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 2500);
+}
+
+async function rescue(action, params={}){
+  if(loading) return;
+  const card = document.querySelector('.card');
+  loading = true;
+  card.classList.add('loading');
+
+  const isSwitch = action === 'switch';
+  const modeName = {
+    'ds-direct':'DeepSeek V4 Pro 直连',
+    'ds-proxy':'DeepSeek V4 Pro 代理',
+    'kimi-k3':'Kimi K3',
+    'kimi-k25':'Kimi K2.5',
+    'kimi-fast':'Kimi 8K 秒回',
+  };
+  const confirmMsg = isSwitch
+    ? `切到 ${modeName[params.mode]||params.mode}？下一条消息生效`
+    : `确定重启 ${params.target||'hermes'}？`;
+
+  if(!confirm(confirmMsg)){ card.classList.remove('loading'); loading=false; return; }
+
+  try{
+    const url = API + '/' + action + '?' + new URLSearchParams(params);
+    const r = await fetch(url, {method:'POST'});
+    const d = await r.json();
+    toast(d.ok ? '✅ 已切换，下条消息生效' : '❌ '+ (d.error||'失败'), d.ok);
+    setTimeout(refreshStatus, 1500);
+  }catch(e){
+    toast('❌ 请求失败: '+e.message, false);
+  }
+  card.classList.remove('loading');
+  loading = false;
+}
+
+refreshStatus();
+setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>

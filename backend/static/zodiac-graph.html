@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>生肖关系图谱</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a1628;color:#e0e6f0;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+.container{width:100%;max-width:480px;padding:12px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+h1{font-size:18px;font-weight:700;color:#e8c547}
+.nav-btns{display:flex;gap:8px}
+.btn-nav{padding:6px 14px;border:1px solid rgba(232,197,71,.4);border-radius:18px;background:rgba(255,255,255,.06);color:#e8c547;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-nav:active{background:rgba(232,197,71,.2)}
+canvas{display:block;width:100%;border-radius:12px;background:rgba(255,255,255,.03);touch-action:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center}
+.leg-item{padding:4px 10px;border-radius:14px;font-size:11px;cursor:pointer;transition:all .2s;border:1px solid transparent;user-select:none}
+.leg-item.active{border-color:currentColor}
+.leg-he{color:#ff6b6b;border-color:#ff6b6b}
+.leg-he.active{background:rgba(255,107,107,.15)}
+.leg-san{color:#51cf66;border-color:#51cf66}
+.leg-san.active{background:rgba(81,207,102,.15)}
+.leg-chong{color:#ff922b;border-color:#ff922b}
+.leg-chong.active{background:rgba(255,146,43,.15)}
+.leg-hai{color:#748ffc;border-color:#748ffc}
+.leg-hai.active{background:rgba(116,143,252,.15)}
+.leg-xing{color:#da77f2;border-color:#da77f2}
+.leg-xing.active{background:rgba(218,119,242,.15)}
+.info-bar{text-align:center;margin-top:8px;font-size:12px;color:#8899aa;min-height:20px}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(232,197,71,.9);color:#0a1628;padding:8px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;font-weight:600}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>🔄 生肖关系图谱</h1>
+<div class="nav-btns">
+<button class="btn-nav" onclick="location.href='https://www.ct256.cn/numtool/'">← 数字工具</button>
+</div>
+</div>
+<canvas id="c"></canvas>
+<div class="legend">
+<span class="leg-item leg-he active" data-type="he">六合</span>
+<span class="leg-item leg-san active" data-type="san">三合</span>
+<span class="leg-item leg-chong active" data-type="chong">六冲</span>
+<span class="leg-item leg-hai active" data-type="hai">相害</span>
+<span class="leg-item leg-xing active" data-type="xing">相刑</span>
+</div>
+<div class="info-bar" id="info">点击生肖查看关系</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ZODIAC = [
+  {name:'鼠',emoji:'🐭',element:'水',branch:'子'},
+  {name:'牛',emoji:'🐮',element:'土',branch:'丑'},
+  {name:'虎',emoji:'🐯',element:'木',branch:'寅'},
+  {name:'兔',emoji:'🐰',element:'木',branch:'卯'},
+  {name:'龙',emoji:'🐲',element:'土',branch:'辰'},
+  {name:'蛇',emoji:'🐍',element:'火',branch:'巳'},
+  {name:'马',emoji:'🐴',element:'火',branch:'午'},
+  {name:'羊',emoji:'🐑',element:'土',branch:'未'},
+  {name:'猴',emoji:'🐵',element:'金',branch:'申'},
+  {name:'鸡',emoji:'🐔',element:'金',branch:'酉'},
+  {name:'狗',emoji:'🐶',element:'土',branch:'戌'},
+  {name:'猪',emoji:'🐷',element:'水',branch:'亥'},
+];
+
+// 六合 (6 pairs) - index pairs
+const HE = [[0,1],[2,11],[3,9],[4,8],[5,7],[6,10]];
+// 三合 (4 trios)
+const SAN = [[0,4,8],[1,9,5],[2,6,10],[3,7,11]];
+// 六冲 (6 pairs) - opposite
+const CHONG = [[0,6],[1,7],[2,8],[3,9],[4,10],[5,11]];
+// 相害 (6 pairs)
+const HAI = [[0,7],[1,6],[2,5],[3,4],[8,11],[9,10]];
+// 相刑
+const XING = [[0,3],[2,5,8],[1,7,11],[4,4],[6,6],[9,9],[10,10]];
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const info = document.getElementById('info');
+let W, H, cx, cy, R;
+let selected = -1;
+let visible = {he:true,san:true,chong:true,hai:true,xing:true};
+const dpr = Math.min(window.devicePixelRatio||1,2);
+
+function resize(){
+  const rect = canvas.getBoundingClientRect();
+  W = rect.width;
+  H = W * 1.05;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  cx = W/2;
+  cy = H/2 - 10;
+  R = Math.min(W,H) * 0.36;
+  draw();
+}
+window.addEventListener('resize',resize);
+
+let animFrame, glowRadius = 0, glowTarget = 0;
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // Radial background glow
+  const grd = ctx.createRadialGradient(cx,cy,R*0.2,cx,cy,R*1.6);
+  grd.addColorStop(0,'rgba(232,197,71,.08)');
+  grd.addColorStop(1,'rgba(10,22,40,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(cx,cy,R*1.6,0,Math.PI*2); ctx.fill();
+
+  // Outer ring
+  ctx.beginPath(); ctx.arc(cx,cy,R*1.12,0,Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,255,255,.05)';
+  ctx.lineWidth = 1; ctx.stroke();
+
+  // Draw relationships
+  const pairs = [];
+  if(visible.he) HE.forEach(p=>pairs.push({p,type:'he',color:'#ff6b6b',width:1.5,dash:[]}));
+  if(visible.san) SAN.forEach(t=>{
+    for(let i=0;i<3;i++) pairs.push({p:[t[i],t[(i+1)%3]],type:'san',color:'#51cf66',width:1.2,dash:[6,3]});
+  });
+  if(visible.chong) CHONG.forEach(p=>pairs.push({p,type:'chong',color:'#ff922b',width:1.5,dash:[]}));
+  if(visible.hai) HAI.forEach(p=>pairs.push({p,type:'hai',color:'#748ffc',width:1,dash:[4,3]}));
+  if(visible.xing) XING.forEach(p=>{
+    if(p.length===2) pairs.push({p,type:'xing',color:'#da77f2',width:1,dash:[3,2]});
+    else {
+      for(let i=0;i<p.length;i++) for(let j=i+1;j<p.length;j++){
+        pairs.push({p:[p[i],p[j]],type:'xing',color:'#da77f2',width:1,dash:[3,2]});
+      }
+    }
+  });
+
+  const angle = i => -Math.PI/2 + (i * 2*Math.PI/12);
+  const pos = i => ({x:cx+R*Math.cos(angle(i)), y:cy+R*Math.sin(angle(i))});
+
+  const highlight = selected >= 0;
+  const related = new Set();
+  if(highlight){
+    if(visible.he) HE.forEach(([a,b])=>{if(a===selected)related.add(b);if(b===selected)related.add(a)});
+    if(visible.san) SAN.forEach(t=>{if(t.includes(selected))t.forEach(x=>related.add(x))});
+    if(visible.chong) CHONG.forEach(([a,b])=>{if(a===selected)related.add(b);if(b===selected)related.add(a)});
+    if(visible.hai) HAI.forEach(([a,b])=>{if(a===selected)related.add(b);if(b===selected)related.add(a)});
+    if(visible.xing) XING.forEach(p=>{
+      if(p.length===2){if(p[0]===selected)related.add(p[1]);if(p[1]===selected)related.add(p[0])}
+      else{if(p.includes(selected))p.forEach(x=>related.add(x))}
+    });
+  }
+
+  // Draw lines
+  pairs.forEach(({p,color,width,dash})=>{
+    const [a,b]=p;
+    const pa=pos(a), pb=pos(b);
+    const bright = highlight && (selected===a||selected===b||related.has(a)||related.has(b));
+    ctx.beginPath();
+    ctx.setLineDash(dash);
+    ctx.moveTo(pa.x,pa.y);
+    ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle = bright ? color : color.replace(')','.15)').replace('rgb','rgba');
+    if(color.startsWith('#')){
+      const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+      ctx.strokeStyle = bright ? color : `rgba(${r},${g},${b},.15)`;
+    }
+    ctx.lineWidth = bright ? width*2 : width;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Draw animal nodes
+  for(let i=0;i<12;i++){
+    const p = pos(i);
+    const isSel = i === selected;
+    const isRel = related.has(i);
+    const alpha = highlight ? (isSel?1:(isRel?.7:.3)) : 1;
+
+    if(isSel){
+      // Glow
+      const glow = ctx.createRadialGradient(p.x,p.y,14,p.x,p.y,32);
+      glow.addColorStop(0,'rgba(232,197,71,.4)');
+      glow.addColorStop(1,'rgba(232,197,71,0)');
+      ctx.beginPath(); ctx.arc(p.x,p.y,32,0,Math.PI*2);
+      ctx.fillStyle=glow; ctx.fill();
+    }
+
+    // Circle bg
+    ctx.beginPath(); ctx.arc(p.x,p.y,18,0,Math.PI*2);
+    ctx.fillStyle = isSel ? 'rgba(232,197,71,.25)' : `rgba(255,255,255,${alpha*.08})`;
+    ctx.fill();
+    ctx.strokeStyle = isSel ? '#e8c547' : `rgba(255,255,255,${alpha*.15})`;
+    ctx.lineWidth = isSel?2:1;
+    ctx.stroke();
+
+    // Emoji
+    ctx.font = `${isSel?22:18}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha = alpha;
+    ctx.fillText(ZODIAC[i].emoji, p.x, p.y-1);
+    ctx.globalAlpha = 1;
+
+    // Name below
+    const outer = {x:cx+(R+34)*Math.cos(angle(i)), y:cy+(R+34)*Math.sin(angle(i))};
+    ctx.font = `${isSel?'bold ':''}11px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle = isSel ? '#e8c547' : `rgba(200,210,220,${alpha*.8})`;
+    ctx.fillText(ZODIAC[i].name, outer.x, outer.y);
+  }
+}
+
+function updateInfo(i){
+  if(i<0){info.textContent='点击生肖查看关系';return;}
+  const z=ZODIAC[i];
+  const rels=[];
+  if(visible.he) HE.forEach(([a,b])=>{if(a===i)rels.push(`六合${ZODIAC[b].name}`);if(b===i)rels.push(`六合${ZODIAC[a].name}`)});
+  if(visible.san) SAN.forEach(t=>{if(t.includes(i))rels.push(`三合${t.filter(x=>x!==i).map(x=>ZODIAC[x].name).join('')}`)});
+  if(visible.chong) CHONG.forEach(([a,b])=>{if(a===i)rels.push(`冲${ZODIAC[b].name}`);if(b===i)rels.push(`冲${ZODIAC[a].name}`)});
+  if(visible.hai) HAI.forEach(([a,b])=>{if(a===i)rels.push(`害${ZODIAC[b].name}`);if(b===i)rels.push(`害${ZODIAC[a].name}`)});
+  const xrel=[];
+  if(visible.xing) XING.forEach(p=>{
+    if(p.length===2){if(p[0]===i)xrel.push(`刑${ZODIAC[p[1]].name}`);if(p[1]===i)xrel.push(`刑${ZODIAC[p[0]].name}`)}
+    else{if(p.includes(i))xrel.push(...p.filter(x=>x!==i).map(x=>'刑'+ZODIAC[x].name))}
+  });
+  info.innerHTML=`<b>${z.emoji} ${z.name}</b>（${z.branch}·${z.element}） ${[...rels,...xrel].join(' | ')}`;
+}
+
+canvas.addEventListener('click',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const angle=i=>-Math.PI/2+(i*2*Math.PI/12);
+  const pos=i=>({x:cx+R*Math.cos(angle(i)),y:cy+R*Math.sin(angle(i))});
+  let found=-1,mind=999;
+  for(let i=0;i<12;i++){
+    const p=pos(i);
+    const d=Math.hypot(mx-p.x,my-p.y);
+    if(d<24&&d<mind){found=i;mind=d}
+  }
+  if(found>=0){
+    selected = selected===found ? -1 : found;
+    updateInfo(selected);
+  }else{
+    selected=-1;updateInfo(-1);
+  }
+  draw();
+});
+
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  const rect=canvas.getBoundingClientRect();
+  const mx=t.clientX-rect.left, my=t.clientY-rect.top;
+  const angle=i=>-Math.PI/2+(i*2*Math.PI/12);
+  const pos=i=>({x:cx+R*Math.cos(angle(i)),y:cy+R*Math.sin(angle(i))});
+  let found=-1,mind=999;
+  for(let i=0;i<12;i++){
+    const p=pos(i);
+    const d=Math.hypot(mx-p.x,my-p.y);
+    if(d<30&&d<mind){found=i;mind=d}
+  }
+  if(found>=0){
+    selected = selected===found ? -1 : found;
+    updateInfo(selected);
+  }else{
+    selected=-1;updateInfo(-1);
+  }
+  draw();
+},{passive:false});
+
+// Legend toggles
+document.querySelectorAll('.leg-item').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const t=el.dataset.type;
+    visible[t]=!visible[t];
+    el.classList.toggle('active',visible[t]);
+    updateInfo(selected);
+    draw();
+  });
+});
+
+resize();
+</script>
+</body>
+</html>

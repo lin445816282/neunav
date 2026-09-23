@@ -499,7 +499,7 @@ body.drag-scrolling { overflow: hidden !important; }
   </div>
 </div>
 
-<script src="https://fastly.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+<script src="/neunav/vue.global.prod.js"></script>
 <script>
 const {createApp, ref, reactive, onMounted, computed, nextTick, watch} = Vue;
 
@@ -741,6 +741,10 @@ const app = createApp({
       'ct256.cn/math-viz': 'mathviz',
       'ct256.cn/school-ready': 'schoolready',
       'ct256.cn/neunav/table-to-list': 'neunav',
+      'ct256.cn/deepseek-tracker': 'deepseek-tracker',
+      'ct256.cn/number-warehouse': 'number-warehouse',
+      'ct256.cn/emct': 'emct',
+      'ct256.cn/workstream': 'workstream',
     };
     function getServiceId(bm) {
       const url = (bm.url || '').toLowerCase();
