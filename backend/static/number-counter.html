@@ -145,9 +145,9 @@
 
     <div class="card" id="chipCard">
         <h3 style="font-size:16px;color:#1a2a4a;margin:0 0 4px">🎯 筹码统计</h3>
-        <div class="hint">输入号码（句点分隔多个，如 03.05）+ 筹码数，点「添加」自动按号码拆分累加；「抽签最冷」「抽取最冷8号」从数字仓库抽取号码填入号码框</div>
+        <div class="hint">输入号码（句点/逗号分隔多个，如 03.05）+ 筹码数点「添加」；也可直接粘贴完整格式（36=30 / 10.26各25 / 10，26各25，支持多行），无需填筹码数</div>
         <div class="chip-input-row">
-            <input type="text" id="chipNumbers" class="chip-num" placeholder="号码，如 03 或 03.05" inputmode="numeric">
+            <input type="text" id="chipNumbers" class="chip-num" placeholder="号码，如 03 或 36=30 或 10.26各25" inputmode="numeric">
             <input type="number" id="chipCount" placeholder="筹码，如 10" inputmode="numeric" min="0">
         </div>
         <div class="button-group">
@@ -386,11 +386,52 @@
                     .filter(function (n) { return n !== null; });
             }
 
+            // 解析带筹码的完整文本：支持 "36=30"、"10.26各25"、"10，26各25"、多组/多行
+            // 返回 [{nums:[号码...], val:筹码}, ...]
+            function parseChipFullText(str) {
+                if (!str) return [];
+                const results = [];
+                const re = /([^各=\n]+?)\s*(各|=)\s*(\d+(?:\.\d+)?)/g;
+                let m;
+                while ((m = re.exec(str)) !== null) {
+                    const numStr = m[1].trim();
+                    const val = parseFloat(m[3]);
+                    if (!numStr || isNaN(val) || val <= 0) continue;
+                    const nums = parseChipNumbers(numStr);
+                    if (nums.length > 0) results.push({ nums: nums, val: val });
+                }
+                return results;
+            }
+
             function addChip() {
                 const numInput = document.getElementById('chipNumbers').value.trim();
                 const valInput = document.getElementById('chipCount').value.trim();
-                if (!numInput || !valInput) {
-                    alert('请输入号码和筹码数');
+                if (!numInput) {
+                    alert('请输入号码');
+                    return;
+                }
+                // 优先识别带筹码的完整格式（36=30 / 10.26各25 / 10，26各25，支持多行）
+                const parsed = parseChipFullText(numInput);
+                if (parsed.length > 0) {
+                    parsed.forEach(function (item) {
+                        item.nums.forEach(function (n) {
+                            const old = chipCounts.get(n) || 0;
+                            chipCounts.set(n, Math.round((old + item.val) * 100) / 100);
+                        });
+                    });
+                    chipLogList.push({
+                        raw: numInput,
+                        val: parsed.map(function (p) { return p.val; }).join('+'),
+                        time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+                    });
+                    renderChip();
+                    saveChip();
+                    document.getElementById('chipNumbers').value = '';
+                    document.getElementById('chipCount').value = '';
+                    return;
+                }
+                if (!valInput) {
+                    alert('请输入筹码数');
                     return;
                 }
                 const chip = parseFloat(valInput);
