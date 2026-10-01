@@ -192,6 +192,7 @@
         <div class="button-group">
             <button id="btnZodiac" onclick="toggleZodiac()">☐ 抽取肖汇</button>
             <button id="btnSizu" class="secondary" onclick="toggleSizu()">☐ 抽取四组</button>
+            <button id="btnHighExcess" class="secondary" onclick="toggleHighExcess()">☐ 抽取高超额</button>
             <button class="secondary" onclick="executeExtract()">✅ 执行抽取·下单</button>
         </div>
         <div id="extractResult"></div>
@@ -639,9 +640,10 @@
             // ===== 多组肖汇总 & 号码筹码（从 number-warning 抽取）=====
             const NW_API = 'https://www.ct256.cn/number-warning/api';
 
-            // 选中态（可同时选中肖汇 / 四组）
+            // 选中态（可同时选中肖汇 / 四组 / 高超额）
             let selZodiac = false;
             let selSizu = false;
+            let selHighExcess = false;
 
             function toggleZodiac() {
                 selZodiac = !selZodiac;
@@ -651,9 +653,14 @@
                 selSizu = !selSizu;
                 updateToggleBtns();
             }
+            function toggleHighExcess() {
+                selHighExcess = !selHighExcess;
+                updateToggleBtns();
+            }
             function updateToggleBtns() {
                 const bz = document.getElementById('btnZodiac');
                 const bs = document.getElementById('btnSizu');
+                const bh = document.getElementById('btnHighExcess');
                 if (bz) {
                     bz.textContent = (selZodiac ? '☑' : '☐') + ' 抽取肖汇';
                     bz.classList.toggle('selected', selZodiac);
@@ -661,6 +668,10 @@
                 if (bs) {
                     bs.textContent = (selSizu ? '☑' : '☐') + ' 抽取四组';
                     bs.classList.toggle('selected', selSizu);
+                }
+                if (bh) {
+                    bh.textContent = (selHighExcess ? '☑' : '☐') + ' 抽取高超额';
+                    bh.classList.toggle('selected', selHighExcess);
                 }
             }
 
@@ -735,8 +746,8 @@
 
             // ===== 执行抽取·下单（把选中类型的号码筹码累加进筹码统计）=====
             async function executeExtract() {
-                if (!selZodiac && !selSizu) {
-                    alert('请先勾选要抽取的类型（肖汇 / 四组，可同时选中）');
+                if (!selZodiac && !selSizu && !selHighExcess) {
+                    alert('请先勾选要抽取的类型（肖汇 / 四组 / 高超额，可同时选中）');
                     return;
                 }
                 const resultEl = document.getElementById('extractResult');
@@ -758,6 +769,13 @@
                         orderChips(d.chip_groups || [], '四组');
                         sections.push(renderSizuHtml(d));
                     }
+                    if (selHighExcess) {
+                        const r = await fetch(NW_API + '/front/highExcessChip?token=' + encodeURIComponent(token));
+                        if (!r.ok) throw new Error('高超额抽取失败：' + r.status);
+                        const d = await r.json();
+                        orderChips(d.chip_groups || [], '高超额');
+                        sections.push(renderHighExcessHtml(d));
+                    }
                     const divider = sections.length > 1
                         ? '<hr style="border:none;border-top:1px dashed #d6e9ff;margin:16px 0">'
                         : '';
@@ -769,6 +787,28 @@
                 } catch (err) {
                     resultEl.innerHTML = '<div class="extract-error">❌ ' + escapeHtml(err.message || String(err)) + '</div>';
                 }
+            }
+
+            function renderHighExcessHtml(d) {
+                const eq4 = (d.eq4 || []).map(pad2).join('.');
+                const eq3 = (d.eq3 || []).map(pad2).join('.');
+                const eq4Card = (d.eq4 || []).length
+                    ? '<div class="ec-card">' +
+                      '<div class="ec-amt">4票 · 5元/号（' + d.eq4.length + '号）</div>' +
+                      '<div class="ec-nums">' + escapeHtml(eq4) + '</div>' +
+                      '<button class="ec-copy" onclick="copyToClipboard(\'' + eq4 + '\')">📋 复制号码</button>' +
+                      '</div>'
+                    : '<div class="chip-empty">暂无 4 票号码</div>';
+                const eq3Card = (d.eq3 || []).length
+                    ? '<div class="ec-card">' +
+                      '<div class="ec-amt">3票 · 5元/号（' + d.eq3.length + '号）</div>' +
+                      '<div class="ec-nums">' + escapeHtml(eq3) + '</div>' +
+                      '<button class="ec-copy" onclick="copyToClipboard(\'' + eq3 + '\')">📋 复制号码</button>' +
+                      '</div>'
+                    : '<div class="chip-empty">暂无 3 票号码</div>';
+                return '<div class="extract-meta">📌 高超额信号池 · ' + escapeHtml(d.period || '') + ' ' + escapeHtml(d.date || '') + ' · 高超额字段 ' + (d.qualified_count || 0) + ' 个 · 数据源：number-warning 高超额</div>' +
+                    '<div style="font-size:13px;font-weight:700;margin:10px 0 6px">🗳️ 组投票选号（4票 / 3票，各 5 元下单）</div>' +
+                    '<div class="extract-chip">' + eq4Card + eq3Card + '</div>';
             }
 
             function renderSizuHtml(d) {
@@ -835,6 +875,7 @@
             window.extractColdest = extractColdest;
             window.toggleZodiac = toggleZodiac;
             window.toggleSizu = toggleSizu;
+            window.toggleHighExcess = toggleHighExcess;
             window.executeExtract = executeExtract;
             window.copyToClipboard = copyToClipboard;
         })();
