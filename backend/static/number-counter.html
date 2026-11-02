@@ -160,6 +160,14 @@
             <button class="secondary" onclick="subtractMin()">✂️ 除最小</button>
             <button class="secondary" onclick="copyChip()">📋 复制筹码</button>
         </div>
+        <div class="button-group">
+            <button onclick="reportOrder()" style="background:#16a34a">📤 上报本期下单</button>
+        </div>
+        <div id="reportResult"></div>
+        <div class="chip-input-row" style="margin:8px 0 0">
+            <input type="number" id="chipMultiplier" placeholder="倍数，如 2（翻倍）/ 0.5（减半）" inputmode="decimal" min="0" step="any" style="flex:1">
+            <button onclick="multiplyChip()" style="flex:0 0 auto">✖️ 乘倍数</button>
+        </div>
         <div id="coldest8Result"></div>
 
         <h4 style="font-size:14px;color:#1a2a4a;margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center">
@@ -180,6 +188,10 @@
             <div id="chipTotal">汇总结果 0</div>
             <div id="chipNumTotal">号码合计 0 个</div>
         </div>
+        <div id="unboughtCard" style="margin:10px 0;padding:10px 12px;background:#fff8f0;border:1px solid #ffe0b3;border-radius:8px">
+            <div style="font-weight:700;color:#1a2a4a;font-size:13px;margin-bottom:6px">🚫 未购买下单号码（<span id="unboughtCount" style="color:#e65100">0</span> 个）</div>
+            <div id="unboughtNums" style="color:#999;font-size:12px;word-break:break-all;line-height:1.7">—</div>
+        </div>
         <div id="chipEmptyTip" class="chip-empty">暂无筹码，请在上方输入号码和筹码数后点击「添加筹码」</div>
 
         <h4 style="font-size:14px;color:#1a2a4a;margin:16px 0 8px">添加记录</h4>
@@ -193,6 +205,8 @@
             <button id="btnZodiac" onclick="toggleZodiac()">☐ 抽取肖汇</button>
             <button id="btnSizu" class="secondary" onclick="toggleSizu()">☐ 抽取四组</button>
             <button id="btnHighExcess" class="secondary" onclick="toggleHighExcess()">☐ 抽取高超额</button>
+            <button id="btnJiuxiao" class="secondary" onclick="toggleJiuxiao()">☐ 抽取九肖投票</button>
+            <button id="btnVotePick" class="secondary" onclick="toggleVotePick()">☐ 抽取投票选号</button>
             <button class="secondary" onclick="executeExtract()">✅ 执行抽取·下单</button>
         </div>
         <div id="extractResult"></div>
@@ -510,6 +524,16 @@
                 if (totalEl) totalEl.textContent = '汇总结果 ' + chipTotal;
                 const numTotalEl = document.getElementById('chipNumTotal');
                 if (numTotalEl) numTotalEl.textContent = '号码合计 ' + chipCounts.size + ' 个';
+                // 未购买下单号码：1~49 里没有筹码的号码
+                const unbought = [];
+                for (let i = 1; i <= 49; i++) {
+                    const key = i < 10 ? '0' + i : String(i);
+                    if (!chipCounts.has(key)) unbought.push(key);
+                }
+                const unboughtCountEl = document.getElementById('unboughtCount');
+                if (unboughtCountEl) unboughtCountEl.textContent = unbought.length;
+                const unboughtNumsEl = document.getElementById('unboughtNums');
+                if (unboughtNumsEl) unboughtNumsEl.textContent = unbought.length ? unbought.join('.') : '—';
                 document.getElementById('chipEmptyTip').style.display =
                     chipCounts.size === 0 ? 'block' : 'none';
 
@@ -571,6 +595,31 @@
                     val: '-' + min,
                     time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
                 });
+                renderChip();
+                saveChip();
+            }
+
+            // 乘倍数：所有号码筹码 × 倍数（整体缩放）
+            function multiplyChip() {
+                const multInput = document.getElementById('chipMultiplier');
+                const mult = parseFloat(multInput.value.trim());
+                if (isNaN(mult) || mult <= 0) {
+                    alert('请输入大于 0 的倍数');
+                    return;
+                }
+                if (chipCounts.size === 0) {
+                    alert('暂无筹码，请先添加筹码');
+                    return;
+                }
+                chipCounts.forEach(function (v, n) {
+                    chipCounts.set(n, Math.round(v * mult * 100) / 100);
+                });
+                chipLogList.push({
+                    raw: '✖️ 乘倍数 ×' + mult,
+                    val: '×' + mult,
+                    time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+                });
+                multInput.value = '';
                 renderChip();
                 saveChip();
             }
@@ -639,11 +688,14 @@
 
             // ===== 多组肖汇总 & 号码筹码（从 number-warning 抽取）=====
             const NW_API = 'https://www.ct256.cn/number-warning/api';
+            const FV2_API = 'https://www.ct256.cn/funds-v2';
 
-            // 选中态（可同时选中肖汇 / 四组 / 高超额）
+            // 选中态（可同时选中肖汇 / 四组 / 高超额 / 九肖投票）
             let selZodiac = false;
             let selSizu = false;
             let selHighExcess = false;
+            let selJiuxiao = false;
+            let selVotePick = false;
 
             function toggleZodiac() {
                 selZodiac = !selZodiac;
@@ -657,10 +709,19 @@
                 selHighExcess = !selHighExcess;
                 updateToggleBtns();
             }
+            function toggleJiuxiao() {
+                selJiuxiao = !selJiuxiao;
+                updateToggleBtns();
+            }
+            function toggleVotePick() {
+                selVotePick = !selVotePick;
+                updateToggleBtns();
+            }
             function updateToggleBtns() {
                 const bz = document.getElementById('btnZodiac');
                 const bs = document.getElementById('btnSizu');
                 const bh = document.getElementById('btnHighExcess');
+                const bj = document.getElementById('btnJiuxiao');
                 if (bz) {
                     bz.textContent = (selZodiac ? '☑' : '☐') + ' 抽取肖汇';
                     bz.classList.toggle('selected', selZodiac);
@@ -672,6 +733,15 @@
                 if (bh) {
                     bh.textContent = (selHighExcess ? '☑' : '☐') + ' 抽取高超额';
                     bh.classList.toggle('selected', selHighExcess);
+                }
+                if (bj) {
+                    bj.textContent = (selJiuxiao ? '☑' : '☐') + ' 抽取九肖投票';
+                    bj.classList.toggle('selected', selJiuxiao);
+                }
+                const bv = document.getElementById('btnVotePick');
+                if (bv) {
+                    bv.textContent = (selVotePick ? '☑' : '☐') + ' 抽取投票选号';
+                    bv.classList.toggle('selected', selVotePick);
                 }
             }
 
@@ -746,8 +816,8 @@
 
             // ===== 执行抽取·下单（把选中类型的号码筹码累加进筹码统计）=====
             async function executeExtract() {
-                if (!selZodiac && !selSizu && !selHighExcess) {
-                    alert('请先勾选要抽取的类型（肖汇 / 四组 / 高超额，可同时选中）');
+                if (!selZodiac && !selSizu && !selHighExcess && !selJiuxiao && !selVotePick) {
+                    alert('请先勾选要抽取的类型（肖汇 / 四组 / 高超额 / 九肖投票 / 投票选号，可同时选中）');
                     return;
                 }
                 const resultEl = document.getElementById('extractResult');
@@ -776,6 +846,24 @@
                         orderChips(d.chip_groups || [], '高超额');
                         sections.push(renderHighExcessHtml(d));
                     }
+                    if (selJiuxiao) {
+                        const r = await fetch(NW_API + '/front/jiuxiaoChip?token=' + encodeURIComponent(token));
+                        if (!r.ok) throw new Error('九肖投票抽取失败：' + r.status);
+                        const d = await r.json();
+                        orderChips(d.chip_groups || [], '九肖投票');
+                        sections.push(renderJiuxiaoHtml(d));
+                    }
+                    if (selVotePick) {
+                        const r = await fetch(FV2_API + '/api/simulate/vote-today?x=6&direction=bottom24&start=2026-05-01', {
+                            headers: { 'X-API-Key': 'funds-v2-ext-2026' }
+                        });
+                        if (!r.ok) throw new Error('投票选号抽取失败：' + r.status);
+                        const d = await r.json();
+                        if (!d.stopped) {
+                            orderChips([{ nums: d.today_picked || [], amount: 5 }], '投票选号');
+                        }
+                        sections.push(renderVotePickHtml(d));
+                    }
                     const divider = sections.length > 1
                         ? '<hr style="border:none;border-top:1px dashed #d6e9ff;margin:16px 0">'
                         : '';
@@ -784,8 +872,43 @@
                         sections.join(divider);
                     renderChip();
                     saveChip();
+                    reportOrder(true);  // 下单后自动同步到 number-warning「下单」台账
                 } catch (err) {
                     resultEl.innerHTML = '<div class="extract-error">❌ ' + escapeHtml(err.message || String(err)) + '</div>';
+                }
+            }
+
+            // ===== 上报本期下单（把当前筹码上报到 number-warning 真实下单台账）=====
+            async function reportOrder(silent) {
+                if (chipCounts.size === 0) {
+                    if (!silent) alert('暂无筹码，请先添加筹码');
+                    return;
+                }
+                const resultEl = document.getElementById('reportResult');
+                if (!silent) resultEl.innerHTML = '<div style="text-align:center;color:#888;padding:8px 0">⏳ 上报下单中…</div>';
+                try {
+                    const token = await getToken();
+                    const chips = [];
+                    chipCounts.forEach(function (chip, num) {
+                        chips.push({ num: Number(num), chip: chip });
+                    });
+                    const r = await fetch(NW_API + '/front/orderReport', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: token, chips: chips }),
+                    });
+                    if (!r.ok) throw new Error('上报失败：' + r.status);
+                    const d = await r.json();
+                    if (silent) {
+                        if (resultEl) resultEl.innerHTML =
+                            '<div style="font-size:12px;font-weight:700;color:#16a34a">✅ 已同步到 number-warning「下单」：' + escapeHtml(d.period || '') + '（' + escapeHtml(d.bet_date || '') + '）· ' + d.num_count + ' 号 · 投注 ' + d.invest + ' 元</div>';
+                    } else {
+                        resultEl.innerHTML =
+                            '<div style="font-size:13px;font-weight:700;color:#16a34a">✅ 已上报 ' + escapeHtml(d.period || '') + '（' + escapeHtml(d.bet_date || '') + '）· ' + d.num_count + ' 号 · 投注 ' + d.invest + ' 元</div>' +
+                            '<div style="font-size:12px;color:#888;margin-top:4px">开奖后自动结算命中/未命中，到 number-warning「下单」页查看</div>';
+                    }
+                } catch (err) {
+                    if (resultEl) resultEl.innerHTML = '<div class="extract-error">❌ ' + escapeHtml(err.message || String(err)) + '</div>';
                 }
             }
 
@@ -809,6 +932,56 @@
                 return '<div class="extract-meta">📌 高超额信号池 · ' + escapeHtml(d.period || '') + ' ' + escapeHtml(d.date || '') + ' · 高超额字段 ' + (d.qualified_count || 0) + ' 个 · 数据源：number-warning 高超额</div>' +
                     '<div style="font-size:13px;font-weight:700;margin:10px 0 6px">🗳️ 组投票选号（4票 / 3票，各 5 元下单）</div>' +
                     '<div class="extract-chip">' + eq4Card + eq3Card + '</div>';
+            }
+
+            function renderJiuxiaoHtml(d) {
+                const votes = d.votes || {};
+                const voteEntries = Object.entries(votes).sort(function (a, b) { return b[1] - a[1]; });
+                const topSet = new Set([d.top1, d.top2, d.top3].filter(Boolean));
+                const votePills = voteEntries.map(function (e) {
+                    const z = e[0], n = e[1];
+                    const cls = topSet.has(z) ? 'v-top' : 'v-cold';
+                    return '<span class="v-pill ' + cls + '">' + escapeHtml(z) + ' ' + n + '票</span>';
+                }).join('');
+                const topLine =
+                    '<div class="extract-top">Top1：<b>' + escapeHtml(d.top1 || '') + '</b>（' + (d.top1_votes || 0) + '票）' +
+                    (d.top2 ? ' · Top2：<b>' + escapeHtml(d.top2) + '</b>（' + (d.top2_votes || 0) + '票）' : '') +
+                    (d.top3 ? ' · Top3：<b>' + escapeHtml(d.top3) + '</b>（' + (d.top3_votes || 0) + '票）' : '') +
+                    '</div>';
+                const chipCards = (d.chip_groups || []).map(function (g) {
+                    const nums = (g.nums || []).map(pad2).join('.');
+                    return '<div class="ec-card">' +
+                        '<div class="ec-amt">' + g.amount + '元（' + (g.nums || []).length + '号）</div>' +
+                        '<div class="ec-nums">' + escapeHtml(nums) + '</div>' +
+                        '<button class="ec-copy" onclick="copyToClipboard(\'' + nums + '\')">📋 复制号码</button>' +
+                        '</div>';
+                }).join('');
+                return '<div class="extract-meta">📌 九肖投票 · ' + escapeHtml(d.period || '') + ' ' + escapeHtml(d.date || '') + ' · 10来源 · 每号5元 · 数据源：number-warning 九肖投票</div>' +
+                    topLine +
+                    '<div class="extract-vote">' + votePills + '</div>' +
+                    '<div style="font-size:13px;font-weight:700;margin:10px 0 6px">📋 号码筹码汇总（下注金额）</div>' +
+                    '<div class="extract-chip">' + (chipCards || '<div class="chip-empty">暂无筹码数据</div>') + '</div>';
+            }
+
+            function renderVotePickHtml(d) {
+                const nums = (d.today_picked || []).map(pad2).join('.');
+                const stoppedHtml = d.stopped
+                    ? '<div class="extract-error" style="margin:8px 0">⛔ 已止损停手（连亏 ' + d.current_streak + ' 期 ≥ ' + d.stop_streak + ' 期），今日不参与下单</div>'
+                    : '';
+                const copyBtn = d.stopped
+                    ? '<div style="font-size:11px;color:#b45309;margin-top:6px">⛔ 已停手，不参与下单</div>'
+                    : '<button class="ec-copy" onclick="copyToClipboard(\'' + nums + '\')">📋 复制号码</button>';
+                const chipCard = (d.today_picked || []).length
+                    ? '<div class="ec-card">' +
+                      '<div class="ec-amt">' + d.today_picked_count + '号 · 5元/号（等额）</div>' +
+                      '<div class="ec-nums">' + escapeHtml(nums) + '</div>' +
+                      copyBtn +
+                      '</div>'
+                    : '<div class="chip-empty">暂无 ≥6 票号码</div>';
+                return '<div class="extract-meta">📌 投票选号 · ' + escapeHtml(d.today_date || '') + ' · 8店投票≥6票 · 反帮 bottom24 · 每号5元 · 数据源：funds-v2</div>' +
+                    stoppedHtml +
+                    '<div style="font-size:13px;font-weight:700;margin:10px 0 6px">📋 号码筹码汇总（下注金额）</div>' +
+                    '<div class="extract-chip">' + chipCard + '</div>';
             }
 
             function renderSizuHtml(d) {
@@ -872,11 +1045,15 @@
             window.resetChip = resetChip;
             window.subtractMin = subtractMin;
             window.copyChip = copyChip;
+            window.multiplyChip = multiplyChip;
             window.extractColdest = extractColdest;
             window.toggleZodiac = toggleZodiac;
             window.toggleSizu = toggleSizu;
             window.toggleHighExcess = toggleHighExcess;
+            window.toggleJiuxiao = toggleJiuxiao;
+            window.toggleVotePick = toggleVotePick;
             window.executeExtract = executeExtract;
+            window.reportOrder = reportOrder;
             window.copyToClipboard = copyToClipboard;
         })();
     </script>
